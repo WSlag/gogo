@@ -108,7 +108,7 @@ export function RecentRides({ className, onSeeAll }: RecentRidesProps) {
   return (
     <section className={cn('', className)}>
       {/* Header */}
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-4">
         <h2 className="text-base font-bold text-gray-900">Recent Rides</h2>
         {onSeeAll && (
           <button
@@ -122,7 +122,7 @@ export function RecentRides({ className, onSeeAll }: RecentRidesProps) {
       </div>
 
       {/* Horizontal scroll container */}
-      <div className="flex gap-3 overflow-x-auto hide-scrollbar snap-x snap-mandatory pb-1">
+      <div className="flex gap-3 overflow-x-auto hide-scrollbar snap-x snap-mandatory pb-2">
         {mockRecentRides.map((ride) => (
           <RecentRideCard
             key={ride.id}

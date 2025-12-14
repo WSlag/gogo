@@ -105,7 +105,7 @@ export function QuickServicesGrid({
   return (
     <section className={cn('', className)}>
       {showHeader && (
-        <h2 className="text-base font-bold text-gray-900 mb-3">Quick Services</h2>
+        <h2 className="text-base font-bold text-gray-900 mb-4">Quick Services</h2>
       )}
 
       <div
@@ -120,7 +120,7 @@ export function QuickServicesGrid({
             <button
               key={service.id}
               onClick={() => navigate(service.path)}
-              className="flex flex-col items-center gap-2 p-2 rounded-xl hover:bg-gray-50 active:scale-95 transition-all group"
+              className="flex flex-col items-center gap-2.5 py-3 px-2 rounded-xl hover:bg-gray-50 active:scale-95 transition-all group"
             >
               {/* Icon container - Clean unified design */}
               <div className={cn(

@@ -98,14 +98,14 @@ export default function RideBookingCard({ className, compact = false }: RideBook
   return (
     <div className={cn('rounded-b-xl shadow-md border border-gray-200 overflow-hidden bg-white', className)}>
       {/* Header */}
-      <div className="px-4 pt-4 pb-3">
+      <div className="px-4 pt-5 pb-4">
         <h3 className="text-primary-600 font-bold text-sm tracking-wide">
           BOOK A RIDE
         </h3>
       </div>
 
       {/* Location inputs */}
-      <div className="px-4 pb-4">
+      <div className="px-4 pb-5">
         <div className="flex items-center gap-3">
           {/* Route dots */}
           <div className="flex flex-col items-center py-1">
@@ -180,8 +180,8 @@ export default function RideBookingCard({ className, compact = false }: RideBook
       </div>
 
       {/* Vehicle Type Selector */}
-      <div className="px-4 pb-4">
-        <p className="text-xs font-medium text-gray-500 mb-2">Vehicle Type</p>
+      <div className="px-4 pb-5">
+        <p className="text-xs font-medium text-gray-500 mb-3">Vehicle Type</p>
         <VehicleTypeSelector
           selected={vehicleType}
           onSelect={setVehicleType}
@@ -202,7 +202,7 @@ export default function RideBookingCard({ className, compact = false }: RideBook
       </div>
 
       {/* Action Buttons */}
-      <div className="p-4 flex gap-3">
+      <div className="px-4 py-5 flex gap-3">
         <button
           onClick={handleSchedule}
           className="flex-1 flex items-center justify-center gap-2 h-12 rounded-xl border-2 border-gray-200 text-gray-700 font-semibold hover:bg-gray-50 active:scale-[0.98] transition-all"

@@ -131,25 +131,25 @@ export default function Home() {
 
       {/* Main Content */}
       <main>
-        <div className="px-4 lg:px-6 pt-4 pb-4 max-w-7xl lg:mx-0">
+        <div className="px-4 lg:px-6 pt-5 pb-6 max-w-7xl lg:mx-0">
           {/* Greeting Section */}
-          <section className="mb-6">
+          <section className="mb-5">
             <RideGreeting userName="Juan" />
           </section>
 
           {/* === RIDE-FIRST HERO === */}
           {/* Ride Booking Card - Hero Section (60-70% viewport on mobile) */}
-          <section className="mb-6">
+          <section className="mb-8">
             <RideBookingCard />
           </section>
 
           {/* Recent Rides - Quick Rebook */}
-          <section className="mb-6">
+          <section className="mb-8">
             <RecentRides onSeeAll={() => navigate('/orders')} />
           </section>
 
           {/* Quick Services Grid - Secondary to Rides */}
-          <section className="mb-6">
+          <section className="mb-8">
             <QuickServicesGrid />
           </section>
 
