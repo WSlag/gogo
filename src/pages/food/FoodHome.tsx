@@ -1,0 +1,330 @@
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Search, Star, Clock, ArrowLeft, SlidersHorizontal, MapPin } from 'lucide-react'
+import { cn } from '@/utils/cn'
+
+// Category data - DoorDash style horizontal tabs
+const categories = [
+  { id: 'all', name: 'All', icon: '🍽️' },
+  { id: 'fast-food', name: 'Fast Food', icon: '🍔' },
+  { id: 'filipino', name: 'Filipino', icon: '🍖' },
+  { id: 'chinese', name: 'Chinese', icon: '🥡' },
+  { id: 'japanese', name: 'Japanese', icon: '🍱' },
+  { id: 'korean', name: 'Korean', icon: '🥢' },
+  { id: 'pizza', name: 'Pizza', icon: '🍕' },
+  { id: 'desserts', name: 'Desserts', icon: '🍰' },
+  { id: 'coffee', name: 'Coffee', icon: '☕' },
+  { id: 'healthy', name: 'Healthy', icon: '🥗' },
+]
+
+// Sort options like DoorDash
+const sortOptions = [
+  { id: 'recommended', name: 'Recommended' },
+  { id: 'rating', name: 'Rating' },
+  { id: 'delivery-time', name: 'Delivery Time' },
+  { id: 'distance', name: 'Distance' },
+]
+
+// Mock data for restaurants with more details
+const mockRestaurants = [
+  {
+    id: '1',
+    name: 'Jollibee',
+    image: 'https://images.unsplash.com/photo-1626645738196-c2a7c87a8f58?w=400&h=300&fit=crop',
+    category: 'Fast Food',
+    rating: 4.8,
+    reviewCount: 2400,
+    deliveryTime: '15-25',
+    deliveryFee: 0,
+    distance: '0.8 km',
+    tags: ['Chicken', 'Burgers', 'Filipino'],
+  },
+  {
+    id: '2',
+    name: 'Mang Inasal',
+    image: 'https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?w=400&h=300&fit=crop',
+    category: 'Filipino',
+    rating: 4.6,
+    reviewCount: 1800,
+    deliveryTime: '20-30',
+    deliveryFee: 29,
+    distance: '1.2 km',
+    tags: ['Chicken', 'Filipino', 'Grilled'],
+  },
+  {
+    id: '3',
+    name: 'Chowking',
+    image: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=400&h=300&fit=crop',
+    category: 'Chinese',
+    rating: 4.5,
+    reviewCount: 1500,
+    deliveryTime: '15-25',
+    deliveryFee: 39,
+    distance: '0.5 km',
+    tags: ['Chinese', 'Dim Sum', 'Noodles'],
+    promo: '20% Off',
+  },
+  {
+    id: '4',
+    name: "McDonald's",
+    image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&h=300&fit=crop',
+    category: 'Fast Food',
+    rating: 4.7,
+    reviewCount: 3200,
+    deliveryTime: '20-30',
+    deliveryFee: 0,
+    distance: '1.5 km',
+    tags: ['Burgers', 'Fries', 'Fast Food'],
+  },
+  {
+    id: '5',
+    name: 'Tokyo Tokyo',
+    image: 'https://images.unsplash.com/photo-1617196034796-73dfa7b1fd56?w=400&h=300&fit=crop',
+    category: 'Japanese',
+    rating: 4.4,
+    reviewCount: 980,
+    deliveryTime: '25-35',
+    deliveryFee: 49,
+    distance: '2.0 km',
+    tags: ['Japanese', 'Bento', 'Rice'],
+  },
+  {
+    id: '6',
+    name: 'KFC',
+    image: 'https://images.unsplash.com/photo-1606755962773-d324e0a13086?w=400&h=300&fit=crop',
+    category: 'Fast Food',
+    rating: 4.5,
+    reviewCount: 2100,
+    deliveryTime: '15-25',
+    deliveryFee: 39,
+    distance: '1.0 km',
+    tags: ['Chicken', 'Fast Food'],
+  },
+  {
+    id: '7',
+    name: "Max's Restaurant",
+    image: 'https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?w=400&h=300&fit=crop',
+    category: 'Filipino',
+    rating: 4.7,
+    reviewCount: 1650,
+    deliveryTime: '25-35',
+    deliveryFee: 49,
+    distance: '1.8 km',
+    tags: ['Filipino', 'Chicken', 'Family'],
+  },
+  {
+    id: '8',
+    name: 'Bonchon',
+    image: 'https://images.unsplash.com/photo-1575932444877-5106bee2a599?w=400&h=300&fit=crop',
+    category: 'Korean',
+    rating: 4.6,
+    reviewCount: 1200,
+    deliveryTime: '20-30',
+    deliveryFee: 59,
+    distance: '2.2 km',
+    tags: ['Korean', 'Chicken', 'Wings'],
+  },
+]
+
+export default function FoodHome() {
+  const navigate = useNavigate()
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState('all')
+  const [selectedSort, setSelectedSort] = useState('recommended')
+
+  const filteredRestaurants = mockRestaurants.filter((restaurant) => {
+    if (selectedCategory !== 'all') {
+      const categoryMatch = restaurant.category.toLowerCase().replace(' ', '-') === selectedCategory
+      if (!categoryMatch) return false
+    }
+    if (searchQuery) {
+      return restaurant.name.toLowerCase().includes(searchQuery.toLowerCase())
+    }
+    return true
+  })
+
+  return (
+    <div className="bg-gray-50 pb-20 lg:pb-0 page-content">
+      {/* Mobile Header - Clean like DoorDash */}
+      <header className="sticky top-0 z-40 bg-white lg:hidden shadow-sm">
+        <div className="px-4 py-3">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate(-1)}
+              className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
+            >
+              <ArrowLeft className="h-5 w-5 text-gray-900" />
+            </button>
+
+            {/* Search Input - Prominent rounded */}
+            <div className="relative flex-1">
+              <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search restaurants"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-12 w-full rounded-full bg-gray-100 pl-12 pr-4 text-sm text-gray-900 placeholder-gray-500 outline-none transition-all focus:bg-white focus:ring-2 focus:ring-gray-300"
+              />
+            </div>
+
+            <button className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 transition-colors">
+              <SlidersHorizontal className="h-5 w-5 text-gray-700" />
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Desktop Header - DoorDash style */}
+      <header className="hidden lg:block bg-white border-b border-gray-100">
+        <div className="max-w-6xl mx-auto px-6 py-5">
+          <h1 className="text-2xl font-bold text-gray-900">Restaurants</h1>
+          <p className="mt-1 text-sm text-gray-500 flex items-center gap-1">
+            <MapPin className="h-4 w-4" />
+            Delivering to Current Location
+          </p>
+        </div>
+      </header>
+
+      {/* Categories - Horizontal scroll with clean pills */}
+      <div className="sticky top-[68px] lg:top-16 z-30 bg-white border-b border-gray-100">
+        <div className="max-w-6xl mx-auto lg:mx-0">
+          <div className="flex gap-2 overflow-x-auto hide-scrollbar px-4 lg:px-6 py-3">
+            {categories.map((category) => (
+              <button
+                key={category.id}
+                onClick={() => setSelectedCategory(category.id)}
+                className={cn(
+                  'flex shrink-0 items-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium transition-all active:scale-95',
+                  selectedCategory === category.id
+                    ? 'bg-gray-900 text-white shadow-sm'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                )}
+              >
+                <span className="text-base">{category.icon}</span>
+                <span>{category.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Sort Options - Desktop only, integrated with categories */}
+      <div className="hidden lg:flex items-center gap-4 max-w-6xl mx-auto px-6 py-2 bg-gray-50">
+        <span className="text-sm text-gray-500">Sort:</span>
+        {sortOptions.map((option) => (
+          <button
+            key={option.id}
+            onClick={() => setSelectedSort(option.id)}
+            className={cn(
+              'text-sm font-medium transition-colors',
+              selectedSort === option.id
+                ? 'text-gray-900'
+                : 'text-gray-500 hover:text-gray-700'
+            )}
+          >
+            {option.name}
+          </button>
+        ))}
+      </div>
+
+      {/* Main Content */}
+      <main className="px-4 py-4 lg:px-6">
+        <div className="max-w-6xl mx-auto">
+          {/* Results count */}
+          <p className="mb-4 text-sm font-medium text-gray-600">
+            {filteredRestaurants.length} restaurants near you
+          </p>
+
+          {/* Restaurant Grid - DoorDash style cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredRestaurants.map((restaurant) => (
+              <button
+                key={restaurant.id}
+                onClick={() => navigate(`/food/restaurant/${restaurant.id}`)}
+                className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-all active:scale-[0.99] text-left"
+              >
+                {/* Restaurant Image - Larger aspect ratio like DoorDash */}
+                <div className="relative aspect-[16/10] bg-gray-200 overflow-hidden">
+                  <img
+                    src={restaurant.image}
+                    alt={restaurant.name}
+                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+                  {restaurant.deliveryFee === 0 && (
+                    <span className="absolute left-3 top-3 rounded-md bg-green-500 px-2.5 py-1 text-xs font-semibold text-white shadow-sm">
+                      Free Delivery
+                    </span>
+                  )}
+                  {restaurant.promo && (
+                    <span className="absolute left-3 top-3 rounded-md bg-primary-600 px-2.5 py-1 text-xs font-semibold text-white shadow-sm">
+                      {restaurant.promo}
+                    </span>
+                  )}
+                  {/* Delivery time badge - DoorDash style bottom right */}
+                  <span className="absolute right-3 bottom-3 rounded-md bg-white px-2.5 py-1 text-xs font-semibold text-gray-900 shadow-md">
+                    {restaurant.deliveryTime} min
+                  </span>
+                </div>
+
+                {/* Restaurant Info - Clean spacing */}
+                <div className="p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="font-semibold text-gray-900 group-hover:text-primary-600 transition-colors">
+                      {restaurant.name}
+                    </h3>
+                    {/* Rating badge - DoorDash style */}
+                    <div className="flex items-center gap-1 shrink-0 bg-gray-100 rounded-md px-2 py-1">
+                      <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
+                      <span className="text-sm font-semibold text-gray-900">{restaurant.rating}</span>
+                    </div>
+                  </div>
+                  <p className="mt-1 text-sm text-gray-500">
+                    {restaurant.tags.slice(0, 2).join(' • ')}
+                  </p>
+                  <div className="mt-2 flex items-center gap-2 text-sm text-gray-500">
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-4 w-4" />
+                      {restaurant.deliveryTime} min
+                    </span>
+                    <span className="text-gray-300">•</span>
+                    <span>{restaurant.distance}</span>
+                    {restaurant.deliveryFee > 0 && (
+                      <>
+                        <span className="text-gray-300">•</span>
+                        <span>₱{restaurant.deliveryFee} fee</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {/* Empty State - Clean and helpful */}
+          {filteredRestaurants.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl shadow-sm">
+              <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gray-100 mb-4">
+                <Search className="h-8 w-8 text-gray-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">No restaurants found</h3>
+              <p className="mt-1 text-sm text-gray-500 text-center max-w-xs">
+                Try adjusting your search or filters to find what you're looking for
+              </p>
+              <button
+                onClick={() => {
+                  setSelectedCategory('all')
+                  setSearchQuery('')
+                }}
+                className="mt-4 rounded-full bg-primary-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-primary-700 transition-colors"
+              >
+                Clear filters
+              </button>
+            </div>
+          )}
+        </div>
+      </main>
+    </div>
+  )
+}

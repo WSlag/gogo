@@ -1,0 +1,104 @@
+{
+  "name": "GOGO - Rides, Food & Grocery",
+  "short_name": "GOGO",
+  "description": "Your all-in-one super app for rides, food delivery, and grocery delivery in the Philippines",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "en",
+  "categories": ["food", "shopping", "transportation"],
+  "icons": [
+    {
+      "src": "/icons/icon-72x72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-128x128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-144x144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-152x152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-384x384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Book a Ride",
+      "short_name": "Ride",
+      "description": "Book a motorcycle or car ride",
+      "url": "/rides",
+      "icons": [{ "src": "/icons/shortcut-ride.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Order Food",
+      "short_name": "Food",
+      "description": "Order food from nearby restaurants",
+      "url": "/food",
+      "icons": [{ "src": "/icons/shortcut-food.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Shop Grocery",
+      "short_name": "Grocery",
+      "description": "Shop groceries from nearby stores",
+      "url": "/grocery",
+      "icons": [{ "src": "/icons/shortcut-grocery.png", "sizes": "192x192" }]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/home.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Home Screen"
+    },
+    {
+      "src": "/screenshots/ride.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Book a Ride"
+    }
+  ],
+  "prefer_related_applications": false,
+  "related_applications": []
+}
