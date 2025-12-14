@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -13,6 +13,10 @@ import {
   MapPin,
 } from 'lucide-react'
 import { Button, Card, Input, Spinner } from '@/components/ui'
+import { useAuthStore } from '@/store/authStore'
+import { useMerchantImageUpload } from '@/hooks/useImageUpload'
+import { collection, doc, setDoc, Timestamp } from 'firebase/firestore'
+import { db } from '@/services/firebase/config'
 import type { MerchantType } from '@/types'
 
 type Step = 'owner' | 'business' | 'documents' | 'review'
@@ -48,9 +52,14 @@ const BUSINESS_TYPES: { type: MerchantType; label: string; description: string }
 
 export default function MerchantRegistration() {
   const navigate = useNavigate()
+  const { user } = useAuthStore()
+  const { uploadImage, uploading } = useMerchantImageUpload()
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [currentStep, setCurrentStep] = useState<Step>('owner')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [currentUploadField, setCurrentUploadField] = useState<string | null>(null)
 
   const [ownerInfo, setOwnerInfo] = useState<OwnerInfo>({
     firstName: '',
@@ -102,20 +111,121 @@ export default function MerchantRegistration() {
   const handleImageUpload = (
     field: 'logo' | 'businessPermit' | 'sanitaryPermit' | 'birRegistration'
   ) => {
-    const placeholder = 'https://via.placeholder.com/300x200?text=Uploaded'
+    setCurrentUploadField(field)
+    fileInputRef.current?.click()
+  }
 
-    if (field === 'logo') {
-      setBusinessInfo((prev) => ({ ...prev, logo: placeholder }))
-    } else {
-      setDocumentInfo((prev) => ({ ...prev, [field]: placeholder }))
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !currentUploadField) return
+
+    try {
+      const url = await uploadImage(file)
+      if (currentUploadField === 'logo') {
+        setBusinessInfo((prev) => ({ ...prev, logo: url }))
+      } else {
+        setDocumentInfo((prev) => ({ ...prev, [currentUploadField]: url }))
+      }
+    } catch (error) {
+      console.error('Upload failed:', error)
     }
+
+    // Reset
+    e.target.value = ''
+    setCurrentUploadField(null)
   }
 
   const handleSubmit = async () => {
     setIsSubmitting(true)
-    await new Promise((resolve) => setTimeout(resolve, 2000))
-    setIsSubmitting(false)
-    setSubmitSuccess(true)
+    setSubmitError(null)
+
+    try {
+      // Create a new merchant document in Firestore
+      const merchantId = user?.uid || `merchant_${Date.now()}`
+
+      const merchantData = {
+        // Owner info
+        ownerName: `${ownerInfo.firstName} ${ownerInfo.lastName}`,
+        ownerFirstName: ownerInfo.firstName,
+        ownerLastName: ownerInfo.lastName,
+        ownerPhone: ownerInfo.phone,
+        email: ownerInfo.email,
+
+        // Business info
+        businessName: businessInfo.name,
+        category: businessInfo.type,
+        description: businessInfo.description,
+        address: businessInfo.address,
+        phone: businessInfo.phone,
+        photoURL: businessInfo.logo,
+
+        // Documents
+        documents: {
+          businessPermit: documentInfo.businessPermit,
+          sanitaryPermit: documentInfo.sanitaryPermit,
+          birRegistration: documentInfo.birRegistration,
+        },
+
+        // Application status
+        applicationStatus: 'pending',
+        isApproved: false,
+        isSuspended: false,
+        submittedAt: Timestamp.now(),
+
+        // Stats (initial)
+        rating: 0,
+        totalOrders: 0,
+        totalRevenue: 0,
+        commissionRate: 15, // Default 15%
+
+        // Operating status
+        status: 'closed',
+        operatingHours: {
+          monday: { open: '08:00', close: '22:00', isOpen: true },
+          tuesday: { open: '08:00', close: '22:00', isOpen: true },
+          wednesday: { open: '08:00', close: '22:00', isOpen: true },
+          thursday: { open: '08:00', close: '22:00', isOpen: true },
+          friday: { open: '08:00', close: '22:00', isOpen: true },
+          saturday: { open: '08:00', close: '22:00', isOpen: true },
+          sunday: { open: '09:00', close: '21:00', isOpen: true },
+        },
+
+        // Settings defaults
+        settings: {
+          autoAcceptOrders: false,
+          notifications: true,
+          soundAlerts: true,
+          preparationTime: 15,
+          minimumOrder: 100,
+          deliveryRadius: 5,
+        },
+
+        // Linked user ID if logged in
+        userId: user?.uid || null,
+
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      }
+
+      // Save to merchants collection
+      await setDoc(doc(db, 'merchants', merchantId), merchantData)
+
+      // Also update user role if logged in
+      if (user?.uid) {
+        await setDoc(doc(db, 'users', user.uid), {
+          role: 'merchant',
+          merchantId: merchantId,
+          updatedAt: Timestamp.now(),
+        }, { merge: true })
+      }
+
+      setSubmitSuccess(true)
+    } catch (error) {
+      console.error('Error submitting application:', error)
+      setSubmitError('Failed to submit application. Please try again.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const isOwnerValid = ownerInfo.firstName && ownerInfo.lastName && ownerInfo.phone && ownerInfo.email
@@ -143,6 +253,15 @@ export default function MerchantRegistration() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-8">
+      {/* Hidden file input for uploads */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleFileChange}
+      />
+
       {/* Header */}
       <div className="bg-primary-600 text-white px-4 py-3">
         <div className="flex items-center gap-3">

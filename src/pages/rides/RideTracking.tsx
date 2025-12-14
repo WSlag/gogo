@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -13,7 +13,8 @@ import {
 } from 'lucide-react'
 import { Button, Card, Avatar, Spinner, Modal } from '@/components/ui'
 import { VehicleIcon } from '@/components/ui/VehicleIcon'
-import { useRide } from '@/hooks'
+import { MapView } from '@/components/maps'
+import { useRide, useRealtimeRide } from '@/hooks'
 import type { RideStatus } from '@/types'
 
 const STATUS_CONFIG: Record<RideStatus, { label: string; color: string; description: string }> = {
@@ -50,6 +51,56 @@ export default function RideTracking() {
   const [cancelReason, setCancelReason] = useState('')
   const [isCancelling, setIsCancelling] = useState(false)
   const [isSubmittingRating, setIsSubmittingRating] = useState(false)
+
+  // Current status derived from ride state
+  const currentStatus = rideStatus || 'pending'
+  const statusConfig = STATUS_CONFIG[currentStatus]
+
+  // Use real-time ride tracking if we have a ride ID
+  const { ride: realtimeRide, driverLocation } = useRealtimeRide(id || '')
+
+  // Build map markers based on current state
+  const mapMarkers = useMemo(() => {
+    const markers: Array<{ position: { lat: number; lng: number }; type: 'pickup' | 'dropoff' | 'driver'; label?: string }> = []
+
+    if (pickup?.latitude && pickup?.longitude) {
+      markers.push({
+        position: { lat: pickup.latitude, lng: pickup.longitude },
+        type: 'pickup',
+        label: 'Pickup',
+      })
+    }
+
+    if (dropoff?.latitude && dropoff?.longitude) {
+      markers.push({
+        position: { lat: dropoff.latitude, lng: dropoff.longitude },
+        type: 'dropoff',
+        label: 'Dropoff',
+      })
+    }
+
+    if (driverLocation) {
+      markers.push({
+        position: { lat: driverLocation.latitude, lng: driverLocation.longitude },
+        type: 'driver',
+        label: driver?.firstName || 'Driver',
+      })
+    }
+
+    return markers
+  }, [pickup, dropoff, driverLocation, driver])
+
+  // Calculate map center
+  const mapCenter = useMemo(() => {
+    if (driverLocation && currentStatus !== 'pending') {
+      return { lat: driverLocation.latitude, lng: driverLocation.longitude }
+    }
+    if (pickup?.latitude && pickup?.longitude) {
+      return { lat: pickup.latitude, lng: pickup.longitude }
+    }
+    // Default to Manila
+    return { lat: 14.5995, lng: 120.9842 }
+  }, [pickup, driverLocation, currentStatus])
 
   const CANCEL_REASONS = [
     'Changed my mind',
@@ -89,9 +140,6 @@ export default function RideTracking() {
     navigate('/rides')
   }
 
-  const currentStatus = rideStatus || 'pending'
-  const statusConfig = STATUS_CONFIG[currentStatus]
-
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -115,26 +163,46 @@ export default function RideTracking() {
         </div>
       </div>
 
-      {/* Map Placeholder */}
-      <div className="relative h-64 bg-gray-200">
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="text-center">
-            <Navigation className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-            <p className="text-sm text-gray-500">Map view</p>
-          </div>
-        </div>
+      {/* Map View */}
+      <div className="relative h-64">
+        <MapView
+          center={mapCenter}
+          zoom={15}
+          markers={mapMarkers}
+          showRoute={mapMarkers.length >= 2}
+          onMapReady={(map) => {
+            // Map is ready, can add additional functionality
+            console.log('Map loaded for ride tracking')
+          }}
+          className="h-full w-full"
+        />
 
         {/* Status Overlay */}
         <div className="absolute bottom-4 left-4 right-4">
-          <div className={`rounded-lg bg-${statusConfig.color}-50 p-3 shadow-lg`}>
+          <div className={`rounded-lg bg-white p-3 shadow-lg border ${
+            statusConfig.color === 'yellow' ? 'border-yellow-200' :
+            statusConfig.color === 'blue' ? 'border-blue-200' :
+            statusConfig.color === 'green' ? 'border-green-200' :
+            statusConfig.color === 'red' ? 'border-red-200' : 'border-primary-200'
+          }`}>
             <div className="flex items-center gap-3">
               {isFindingDriver || currentStatus === 'pending' ? (
                 <Spinner size="sm" />
               ) : (
-                <div className={`h-3 w-3 rounded-full bg-${statusConfig.color}-500`} />
+                <div className={`h-3 w-3 rounded-full ${
+                  statusConfig.color === 'yellow' ? 'bg-yellow-500' :
+                  statusConfig.color === 'blue' ? 'bg-blue-500' :
+                  statusConfig.color === 'green' ? 'bg-green-500' :
+                  statusConfig.color === 'red' ? 'bg-red-500' : 'bg-primary-500'
+                }`} />
               )}
               <div>
-                <p className={`font-semibold text-${statusConfig.color}-700`}>
+                <p className={`font-semibold ${
+                  statusConfig.color === 'yellow' ? 'text-yellow-700' :
+                  statusConfig.color === 'blue' ? 'text-blue-700' :
+                  statusConfig.color === 'green' ? 'text-green-700' :
+                  statusConfig.color === 'red' ? 'text-red-700' : 'text-primary-700'
+                }`}>
                   {statusConfig.label}
                 </p>
                 <p className="text-sm text-gray-600">{statusConfig.description}</p>

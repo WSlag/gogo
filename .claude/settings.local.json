@@ -4,7 +4,16 @@
       "Bash(npx tailwindcss:*)",
       "Bash(node node_modules/tailwindcss/lib/cli.js:*)",
       "Bash(npm install:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(copy NUL \"c:\\Users\\Administrator\\GOGO\\.env\")",
+      "Bash(firebase login:*)",
+      "Bash(firebase projects:list:*)",
+      "Bash(firebase use:*)",
+      "Bash(firebase deploy:*)",
+      "Bash(npm run dev)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(firebase auth:export:*)"
     ]
   }
 }

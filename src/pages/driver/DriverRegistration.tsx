@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -12,6 +12,10 @@ import {
   AlertCircle,
 } from 'lucide-react'
 import { Button, Card, Input, Spinner } from '@/components/ui'
+import { useAuthStore } from '@/store/authStore'
+import { useDocumentUpload } from '@/hooks/useImageUpload'
+import { doc, setDoc, updateDoc, Timestamp } from 'firebase/firestore'
+import { db } from '@/services/firebase/config'
 import type { VehicleType } from '@/types'
 
 type Step = 'personal' | 'vehicle' | 'documents' | 'review'
@@ -51,9 +55,14 @@ const VEHICLE_TYPES: { type: VehicleType; label: string; description: string }[]
 
 export default function DriverRegistration() {
   const navigate = useNavigate()
+  const { user } = useAuthStore()
+  const { uploadImage, uploading } = useDocumentUpload()
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [currentStep, setCurrentStep] = useState<Step>('personal')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [currentUploadField, setCurrentUploadField] = useState<string | null>(null)
 
   const [personalInfo, setPersonalInfo] = useState<PersonalInfo>({
     firstName: '',
@@ -109,23 +118,109 @@ export default function DriverRegistration() {
   const handleImageUpload = (
     field: 'profileImage' | 'licenseFront' | 'licenseBack' | 'orCr' | 'nbiClearance'
   ) => {
-    // In production, this would open a file picker
-    // For now, simulate upload with a placeholder
-    const placeholder = 'https://via.placeholder.com/300x200?text=Uploaded'
+    setCurrentUploadField(field)
+    fileInputRef.current?.click()
+  }
 
-    if (field === 'profileImage') {
-      setPersonalInfo((prev) => ({ ...prev, profileImage: placeholder }))
-    } else {
-      setDocumentInfo((prev) => ({ ...prev, [field]: placeholder }))
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !currentUploadField) return
+
+    try {
+      const url = await uploadImage(file)
+      if (currentUploadField === 'profileImage') {
+        setPersonalInfo((prev) => ({ ...prev, profileImage: url }))
+      } else {
+        setDocumentInfo((prev) => ({ ...prev, [currentUploadField]: url }))
+      }
+    } catch (error) {
+      console.error('Upload failed:', error)
     }
+
+    // Reset
+    e.target.value = ''
+    setCurrentUploadField(null)
   }
 
   const handleSubmit = async () => {
+    if (!user?.uid) {
+      setSubmitError('Please log in to submit your application')
+      return
+    }
+
     setIsSubmitting(true)
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 2000))
-    setIsSubmitting(false)
-    setSubmitSuccess(true)
+    setSubmitError(null)
+
+    try {
+      // Save driver application to Firestore
+      // Build driverData without undefined values (Firestore rejects undefined)
+      const driverData: Record<string, unknown> = {
+        // Personal info
+        displayName: `${personalInfo.firstName} ${personalInfo.lastName}`,
+        firstName: personalInfo.firstName,
+        lastName: personalInfo.lastName,
+        phone: personalInfo.phone,
+        email: personalInfo.email || user.email || '',
+
+        // Role
+        role: 'driver',
+
+        // Driver-specific info
+        driverInfo: {
+          vehicleType: vehicleInfo.type,
+          vehicleMake: vehicleInfo.make,
+          vehicleModel: vehicleInfo.model,
+          vehicleYear: vehicleInfo.year,
+          vehicleColor: vehicleInfo.color,
+          vehiclePlate: vehicleInfo.plateNumber,
+
+          licenseNumber: documentInfo.licenseNumber,
+          licenseExpiry: documentInfo.licenseExpiry,
+
+          // Only include documents that have values
+          documents: Object.fromEntries(
+            Object.entries({
+              licenseFront: documentInfo.licenseFront,
+              licenseBack: documentInfo.licenseBack,
+              orCr: documentInfo.orCr,
+              nbiClearance: documentInfo.nbiClearance,
+            }).filter(([, value]) => value !== null && value !== undefined)
+          ),
+
+          // Application status
+          applicationStatus: 'pending',
+          isApproved: false,
+          isSuspended: false,
+          submittedAt: Timestamp.now(),
+
+          // Stats (initial)
+          rating: 0,
+          totalRides: 0,
+          totalEarnings: 0,
+          completionRate: 0,
+          acceptanceRate: 0,
+          status: 'offline',
+        },
+
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      }
+
+      // Only add photoURL if it exists (Firestore rejects undefined/null)
+      if (personalInfo.profileImage) {
+        driverData.photoURL = personalInfo.profileImage
+      }
+
+      // Save to users collection
+      await setDoc(doc(db, 'users', user.uid), driverData, { merge: true })
+
+      setSubmitSuccess(true)
+    } catch (error) {
+      console.error('Error submitting application:', error)
+      setSubmitError('Failed to submit application. Please try again.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const isPersonalValid = personalInfo.firstName && personalInfo.lastName && personalInfo.phone
@@ -153,6 +248,15 @@ export default function DriverRegistration() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-8">
+      {/* Hidden file input for uploads */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleFileChange}
+      />
+
       {/* Header */}
       <div className="bg-primary-600 text-white px-4 py-3">
         <div className="flex items-center gap-3">

@@ -1,6 +1,15 @@
 # Environment variables
 .env
 .env.local
+.env.production
+
+# Firebase
+serviceAccountKey.json
+*-debug.log
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+.firebase/
 
 # Logs
 logs

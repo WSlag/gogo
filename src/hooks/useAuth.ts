@@ -8,6 +8,8 @@ import {
   signInWithFacebook,
   signOut,
   onAuthChange,
+  getStoredConfirmationResult,
+  clearStoredConfirmationResult,
 } from '@/services/firebase/auth'
 import {
   getDocument,
@@ -106,7 +108,10 @@ export function useAuth(): UseAuthReturn {
   }, [setLoading, setError])
 
   const verifyCode = useCallback(async (code: string): Promise<boolean> => {
-    if (!confirmationResult) {
+    // Try local state first, then module-level stored result
+    const activeConfirmation = confirmationResult || getStoredConfirmationResult()
+
+    if (!activeConfirmation) {
       setError('No verification in progress')
       return false
     }
@@ -114,9 +119,10 @@ export function useAuth(): UseAuthReturn {
     try {
       setLoading(true)
       setError(null)
-      const firebaseUser = await confirmationResult.confirm(code)
+      const firebaseUser = await activeConfirmation.confirm(code)
       setUser(firebaseUser.user)
       setConfirmationResult(null)
+      clearStoredConfirmationResult()
 
       // Check if user profile exists
       const existingProfile = await getDocument<User>(collections.users, firebaseUser.user.uid)
@@ -162,7 +168,6 @@ export function useAuth(): UseAuthReturn {
           lastName: firebaseUser.displayName?.split(' ').slice(1).join(' ') || '',
           email: firebaseUser.email || '',
           phone: firebaseUser.phoneNumber || '',
-          profileImage: firebaseUser.photoURL || undefined,
           walletBalance: 0,
           referralCode: generateReferralCode(),
           status: 'active',
@@ -176,6 +181,10 @@ export function useAuth(): UseAuthReturn {
             language: 'en',
             currency: 'PHP',
           },
+        }
+        // Only add profileImage if it exists (Firestore rejects undefined)
+        if (firebaseUser.photoURL) {
+          newProfile.profileImage = firebaseUser.photoURL
         }
         await setDocument(collections.users, firebaseUser.uid, {
           ...newProfile,
@@ -230,7 +239,6 @@ export function useAuth(): UseAuthReturn {
           lastName: firebaseUser.displayName?.split(' ').slice(1).join(' ') || '',
           email: firebaseUser.email || '',
           phone: firebaseUser.phoneNumber || '',
-          profileImage: firebaseUser.photoURL || undefined,
           walletBalance: 0,
           referralCode: generateReferralCode(),
           status: 'active',
@@ -244,6 +252,10 @@ export function useAuth(): UseAuthReturn {
             language: 'en',
             currency: 'PHP',
           },
+        }
+        // Only add profileImage if it exists (Firestore rejects undefined)
+        if (firebaseUser.photoURL) {
+          newProfile.profileImage = firebaseUser.photoURL
         }
         await setDocument(collections.users, firebaseUser.uid, {
           ...newProfile,
@@ -309,9 +321,6 @@ export function useAuth(): UseAuthReturn {
         email: data.email || user.email || '',
         firstName: data.firstName || '',
         lastName: data.lastName || '',
-        profileImage: data.profileImage || user.photoURL || undefined,
-        dateOfBirth: data.dateOfBirth,
-        gender: data.gender,
         savedLocations: [],
         walletBalance: 0,
         referralCode: generateReferralCode(),
@@ -326,6 +335,18 @@ export function useAuth(): UseAuthReturn {
           language: 'en',
           currency: 'PHP',
         },
+      }
+
+      // Only add optional fields if they have values (Firestore rejects undefined)
+      const profileImageValue = data.profileImage || user.photoURL
+      if (profileImageValue) {
+        newProfile.profileImage = profileImageValue
+      }
+      if (data.dateOfBirth) {
+        newProfile.dateOfBirth = data.dateOfBirth
+      }
+      if (data.gender) {
+        newProfile.gender = data.gender
       }
 
       await setDocument(collections.users, user.uid, {

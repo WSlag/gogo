@@ -68,6 +68,26 @@ const MerchantMenu = lazy(() => import('@/pages/merchant/MerchantMenu'))
 const AdminDashboard = lazy(() => import('@/pages/admin/AdminDashboard'))
 const AdminUsers = lazy(() => import('@/pages/admin/AdminUsers'))
 const AdminAnalytics = lazy(() => import('@/pages/admin/AdminAnalytics'))
+const AdminDrivers = lazy(() => import('@/pages/admin/AdminDrivers'))
+const AdminMerchants = lazy(() => import('@/pages/admin/AdminMerchants'))
+const AdminApprovals = lazy(() => import('@/pages/admin/AdminApprovals'))
+const AdminOrders = lazy(() => import('@/pages/admin/AdminOrders'))
+
+// Driver Portal - Additional Pages
+const DriverProfile = lazy(() => import('@/pages/driver/DriverProfile'))
+const DriverStats = lazy(() => import('@/pages/driver/DriverStats'))
+
+// Merchant Portal - Additional Pages
+const MerchantSettings = lazy(() => import('@/pages/merchant/MerchantSettings'))
+const MerchantEarnings = lazy(() => import('@/pages/merchant/MerchantEarnings'))
+const MerchantAnalytics = lazy(() => import('@/pages/merchant/MerchantAnalytics'))
+
+// Notifications
+const Notifications = lazy(() => import('@/pages/notifications/Notifications'))
+
+// Promos & Referral
+const Promos = lazy(() => import('@/pages/promos/Promos'))
+const Referral = lazy(() => import('@/pages/referral/Referral'))
 
 // Create React Query client
 const queryClient = new QueryClient({
@@ -239,17 +259,47 @@ function App() {
               <Route path="/driver/earnings" element={<DriverEarnings />} />
               <Route path="/driver/active" element={<DriverActiveRide />} />
               <Route path="/driver/history" element={<DriverHistory />} />
+              <Route path="/driver/profile" element={<DriverProfile />} />
+              <Route path="/driver/stats" element={<DriverStats />} />
 
               {/* Merchant Portal Routes (no bottom nav layout) */}
               <Route path="/merchant" element={<MerchantDashboard />} />
               <Route path="/merchant/register" element={<MerchantRegistration />} />
               <Route path="/merchant/orders" element={<MerchantOrders />} />
               <Route path="/merchant/menu" element={<MerchantMenu />} />
+              <Route path="/merchant/settings" element={<MerchantSettings />} />
+              <Route path="/merchant/earnings" element={<MerchantEarnings />} />
+              <Route path="/merchant/analytics" element={<MerchantAnalytics />} />
 
               {/* Admin Portal Routes */}
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/admin/users" element={<AdminUsers />} />
               <Route path="/admin/analytics" element={<AdminAnalytics />} />
+              <Route path="/admin/drivers" element={<AdminDrivers />} />
+              <Route path="/admin/merchants" element={<AdminMerchants />} />
+              <Route path="/admin/approvals" element={<AdminApprovals />} />
+              <Route path="/admin/orders" element={<AdminOrders />} />
+
+              {/* Notifications */}
+              <Route
+                path="/notifications"
+                element={
+                  <ProtectedRoute>
+                    <Notifications />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Promos & Referral */}
+              <Route path="/promos" element={<Promos />} />
+              <Route
+                path="/referral"
+                element={
+                  <ProtectedRoute>
+                    <Referral />
+                  </ProtectedRoute>
+                }
+              />
             </Routes>
           </Suspense>
         </AuthListener>

@@ -16,6 +16,19 @@ import { auth } from './config'
 // Recaptcha verifier instance
 let recaptchaVerifier: RecaptchaVerifier | null = null
 
+// Store confirmation result at module level to persist across navigation
+let storedConfirmationResult: ConfirmationResult | null = null
+
+// Get stored confirmation result
+export const getStoredConfirmationResult = (): ConfirmationResult | null => {
+  return storedConfirmationResult
+}
+
+// Clear stored confirmation result
+export const clearStoredConfirmationResult = (): void => {
+  storedConfirmationResult = null
+}
+
 // Initialize recaptcha verifier
 export const initRecaptcha = (containerId: string) => {
   if (recaptchaVerifier) {
@@ -48,6 +61,8 @@ export const sendOTP = async (phoneNumber: string): Promise<ConfirmationResult> 
     : `+63${phoneNumber.replace(/^0/, '')}`
 
   const confirmationResult = await signInWithPhoneNumber(auth, formattedPhone, recaptchaVerifier)
+  // Store at module level for persistence across navigation
+  storedConfirmationResult = confirmationResult
   return confirmationResult
 }
 
