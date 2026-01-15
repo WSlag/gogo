@@ -273,14 +273,16 @@ export function useAuth(): UseAuthReturn {
     } catch (err) {
       // Don't show error for cancelled popup (user closed it or duplicate request)
       const firebaseError = err as { code?: string; message?: string }
+      const errorMessage = firebaseError.message || ''
       if (firebaseError.code === 'auth/cancelled-popup-request' ||
           firebaseError.code === 'auth/popup-closed-by-user' ||
-          (err instanceof Error && err.message === 'Sign-in already in progress')) {
+          errorMessage.includes('cancelled-popup-request') ||
+          errorMessage.includes('popup-closed-by-user') ||
+          errorMessage === 'Sign-in already in progress') {
         // Silently ignore these - not actual errors
         return false
       }
-      const errorMessage = err instanceof Error ? err.message : 'Google sign-in failed'
-      setError(errorMessage)
+      setError(err instanceof Error ? err.message : 'Google sign-in failed')
       return false
     } finally {
       setLoading(false)
