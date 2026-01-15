@@ -87,7 +87,7 @@ export default function Profile() {
     <div className="bg-gray-50 min-h-screen pb-24 lg:pb-0 page-content">
       {/* Header */}
       <header className="bg-white border-b border-gray-100">
-        <div className="px-4 py-4 lg:px-8">
+        <div className="px-6 py-4 lg:px-8">
           <div className="max-w-3xl mx-auto">
             <h1 className="text-xl lg:text-2xl font-bold text-gray-900">Account</h1>
           </div>
@@ -95,7 +95,7 @@ export default function Profile() {
       </header>
 
       {/* Main Content */}
-      <main className="px-4 py-4 lg:px-8">
+      <main className="px-6 py-4 lg:px-8">
         <div className="max-w-3xl mx-auto space-y-4">
 
           {/* Profile Card */}

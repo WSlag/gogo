@@ -127,7 +127,7 @@ export default function RideHome() {
     <div className="bg-white pb-36 lg:pb-8 page-content">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-white border-b border-gray-100 lg:top-16">
-        <div className="px-4 py-3 lg:px-8 lg:py-4">
+        <div className="px-6 py-3 lg:px-8 lg:py-4">
           <div className="max-w-3xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-3">
               <button
@@ -150,7 +150,7 @@ export default function RideHome() {
       </header>
 
       {/* Main Content */}
-      <main className="px-4 py-4 lg:px-8">
+      <main className="px-6 py-4 lg:px-8">
         <div className="max-w-3xl mx-auto space-y-6">
         {/* Location Inputs */}
         <div className="rounded-xl border border-gray-100 divide-y divide-gray-100">

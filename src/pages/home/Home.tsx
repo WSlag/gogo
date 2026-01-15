@@ -136,7 +136,7 @@ export default function Home() {
 
       {/* Main Content */}
       <main>
-        <div className="px-5 lg:px-6 pt-6 pb-8 max-w-7xl lg:mx-0">
+        <div className="px-6 lg:px-8 pt-6 pb-8 max-w-7xl lg:mx-0">
           {/* Greeting Section */}
           <section className="mb-6">
             <RideGreeting userName={userName} />

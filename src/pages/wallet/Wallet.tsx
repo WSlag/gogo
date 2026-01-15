@@ -89,7 +89,7 @@ export default function Wallet() {
     <div className="bg-white pb-20 lg:pb-0 page-content">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-white border-b border-gray-100 lg:top-16">
-        <div className="px-4 py-3 lg:px-8 lg:py-4">
+        <div className="px-6 py-3 lg:px-8 lg:py-4">
           <div className="max-w-3xl mx-auto flex items-center gap-3">
             <button
               onClick={() => navigate(-1)}
@@ -103,7 +103,7 @@ export default function Wallet() {
       </header>
 
       {/* Main Content */}
-      <main className="px-4 py-4 lg:px-8">
+      <main className="px-6 py-4 lg:px-8">
         <div className="max-w-3xl mx-auto space-y-6">
         {/* Balance Card */}
         <div className="rounded-2xl bg-gray-900 p-5 text-white">

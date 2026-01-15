@@ -101,7 +101,7 @@ export default function OrderList() {
     <div className="bg-white pb-20 lg:pb-0 page-content">
       {/* Header */}
       <header className="border-b border-gray-100">
-        <div className="px-4 py-4 lg:px-8">
+        <div className="px-6 py-4 lg:px-8">
           <div className="max-w-4xl mx-auto">
             <h1 className="text-xl lg:text-2xl font-bold text-gray-900">Orders</h1>
           </div>
@@ -109,7 +109,7 @@ export default function OrderList() {
       </header>
 
       {/* Main Content */}
-      <main className="px-4 py-4 lg:px-8">
+      <main className="px-6 py-4 lg:px-8">
         <div className="max-w-4xl mx-auto space-y-4">
           {/* Filter Tabs */}
           <div className="flex gap-2">

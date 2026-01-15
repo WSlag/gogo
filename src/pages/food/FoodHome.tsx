@@ -86,7 +86,7 @@ export default function FoodHome() {
     <div className="bg-gray-50 pb-16 lg:pb-0 page-content">
       {/* Mobile Header - Clean like DoorDash */}
       <header className="sticky top-0 z-40 bg-white lg:hidden shadow-sm">
-        <div className="px-4 py-3">
+        <div className="px-6 py-3">
           <div className="flex items-center gap-3">
             <button
               onClick={() => navigate(-1)}
@@ -144,7 +144,7 @@ export default function FoodHome() {
       {/* Categories - Horizontal scroll with clean pills */}
       <div className="sticky top-[68px] lg:top-16 z-30 bg-white border-b border-gray-100">
         <div className="max-w-6xl mx-auto lg:mx-0">
-          <div className="flex gap-2 overflow-x-auto hide-scrollbar px-4 lg:px-6 py-3">
+          <div className="flex gap-2 overflow-x-auto hide-scrollbar px-6 lg:px-8 py-3">
             {categories.map((category) => (
               <button
                 key={category.id}
@@ -184,7 +184,7 @@ export default function FoodHome() {
       </div>
 
       {/* Main Content */}
-      <main className="px-4 py-4 lg:px-6">
+      <main className="px-6 py-4 lg:px-8">
         <div className="max-w-6xl mx-auto">
           {/* Loading State */}
           {isLoading && merchants.length === 0 && (

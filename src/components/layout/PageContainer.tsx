@@ -18,7 +18,7 @@ export function PageContainer({
     <main
       className={cn(
         'flex-1',
-        !noPadding && 'px-4',
+        !noPadding && 'px-6',
         !noBottomPadding && 'pb-20', // Account for bottom nav
         className
       )}

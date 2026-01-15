@@ -209,7 +209,7 @@ export default function Checkout() {
   return (
     <div className="min-h-screen bg-gray-50 pb-32">
       {/* Header */}
-      <div className="sticky top-0 z-30 lg:top-16 bg-white px-4 py-3 shadow-sm">
+      <div className="sticky top-0 z-30 lg:top-16 bg-white px-6 py-3 shadow-sm">
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate(-1)}
@@ -221,7 +221,7 @@ export default function Checkout() {
         </div>
       </div>
 
-      <div className="p-4 space-y-4">
+      <div className="px-6 py-4 space-y-4">
         {/* Error Message */}
         {error && (
           <div className="flex items-center gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-600">
