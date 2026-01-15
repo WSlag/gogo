@@ -59,18 +59,18 @@ export function StickySearchBar({
     <div
       className={cn(
         'sticky z-30 bg-white/95 backdrop-blur-sm transition-all duration-300 ease-out lg:hidden',
-        isVisible ? 'top-12 translate-y-0 opacity-100' : 'top-12 -translate-y-full opacity-0 pointer-events-none',
+        isVisible ? 'top-14 translate-y-0 opacity-100' : 'top-14 -translate-y-full opacity-0 pointer-events-none',
         className
       )}
     >
-      <div className="px-4 py-3 border-b border-gray-100">
+      <div className="px-5 py-4 border-b border-gray-100">
         <div className="relative">
           <input
             type="text"
             value={searchQuery}
             onChange={handleChange}
             placeholder="Search..."
-            className="h-11 w-full rounded-full bg-gray-100 px-5 pr-10 text-sm text-gray-900 placeholder-gray-500 outline-none transition-all focus:bg-white focus:ring-2 focus:ring-primary-100 focus:border-primary-300 border border-transparent"
+            className="h-12 w-full rounded-full bg-gray-100 px-5 pr-10 text-sm text-gray-900 placeholder-gray-500 outline-none transition-all focus:bg-white focus:ring-2 focus:ring-primary-100 focus:border-primary-300 border border-transparent"
           />
           {searchQuery && (
             <button

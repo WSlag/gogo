@@ -16,7 +16,7 @@ export function MobileHeader({ className }: MobileHeaderProps) {
         className
       )}
     >
-      <div className="h-12 px-4 flex items-center justify-between">
+      <div className="h-14 px-5 flex items-center justify-between">
         {/* Logo */}
         <div className="flex items-center gap-2">
           <img

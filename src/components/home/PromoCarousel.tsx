@@ -101,7 +101,7 @@ export function PromoCarousel({ className, onSeeAll }: PromoCarouselProps) {
       {/* Carousel */}
       <div
         ref={scrollRef}
-        className="flex gap-3 overflow-x-auto hide-scrollbar snap-x snap-mandatory pb-1"
+        className="flex gap-4 overflow-x-auto hide-scrollbar snap-x snap-mandatory pb-1"
       >
         {deals.map((deal) => (
           <DealCard
@@ -170,7 +170,7 @@ function DealCard({ deal, onClick }: DealCardProps) {
       </div>
 
       {/* Restaurant name */}
-      <div className="p-3">
+      <div className="p-4">
         <p className="text-sm font-semibold text-gray-900 truncate">
           {deal.restaurantName}
         </p>

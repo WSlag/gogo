@@ -136,37 +136,37 @@ export default function Home() {
 
       {/* Main Content */}
       <main>
-        <div className="px-4 lg:px-6 pt-5 pb-6 max-w-7xl lg:mx-0">
+        <div className="px-5 lg:px-6 pt-6 pb-8 max-w-7xl lg:mx-0">
           {/* Greeting Section */}
-          <section className="mb-5">
+          <section className="mb-6">
             <RideGreeting userName={userName} />
           </section>
 
           {/* === RIDE-FIRST HERO === */}
           {/* Ride Booking Card - Hero Section (60-70% viewport on mobile) */}
-          <section className="mb-8">
+          <section className="mb-10">
             <RideBookingCard />
           </section>
 
           {/* Recent Rides - Quick Rebook */}
-          <section className="mb-8">
+          <section className="mb-10">
             <RecentRides onSeeAll={() => navigate('/orders')} />
           </section>
 
           {/* Quick Services Grid - Secondary to Rides */}
-          <section className="mb-8">
+          <section className="mb-10">
             <QuickServicesGrid />
           </section>
 
           {/* === FOOD & DISCOVERY SECTIONS === */}
 
           {/* Flash Deals Carousel */}
-          <section className="mb-6">
+          <section className="mb-8">
             <PromoCarousel onSeeAll={() => navigate('/food?filter=promos')} />
           </section>
 
           {/* Category Pills - Dynamic Filtering */}
-          <section className="mb-6">
+          <section className="mb-8">
             <CategoryPills
               selected={selectedCategory}
               onSelect={setSelectedCategory}
@@ -174,7 +174,7 @@ export default function Home() {
           </section>
 
           {/* Trending Section - Social Proof */}
-          <section className="mb-6">
+          <section className="mb-8">
             <TrendingSection
               location="Cotabato City"
               onSeeAll={() => navigate('/food?filter=trending')}
@@ -182,7 +182,7 @@ export default function Home() {
           </section>
 
           {/* Featured Restaurants Section */}
-          <section className="mb-6">
+          <section className="mb-8">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-gray-900">Featured Near You</h2>
               <button

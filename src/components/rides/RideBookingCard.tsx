@@ -98,14 +98,14 @@ export default function RideBookingCard({ className, compact = false }: RideBook
   return (
     <div className={cn('rounded-b-xl shadow-md border border-gray-200 overflow-hidden bg-white', className)}>
       {/* Header */}
-      <div className="px-4 pt-5 pb-4">
+      <div className="px-5 pt-6 pb-5">
         <h3 className="text-primary-600 font-bold text-sm tracking-wide">
           BOOK A RIDE
         </h3>
       </div>
 
       {/* Location inputs */}
-      <div className="px-4 pb-5">
+      <div className="px-5 pb-6">
         <div className="flex items-center gap-3">
           {/* Route dots */}
           <div className="flex flex-col items-center py-1">
@@ -120,7 +120,7 @@ export default function RideBookingCard({ className, compact = false }: RideBook
             <button
               onClick={() => handleLocationClick('pickup')}
               className={cn(
-                'w-full flex items-center px-4 py-3 rounded-lg border transition-all text-left',
+                'w-full flex items-center px-4 py-3.5 rounded-lg border transition-all text-left',
                 pickup
                   ? 'border-gray-200 bg-gray-50'
                   : 'border-primary-200 bg-primary-50'
@@ -143,7 +143,7 @@ export default function RideBookingCard({ className, compact = false }: RideBook
             <button
               onClick={() => handleLocationClick('dropoff')}
               className={cn(
-                'w-full flex items-center px-4 py-3 rounded-lg border transition-all text-left',
+                'w-full flex items-center px-4 py-3.5 rounded-lg border transition-all text-left',
                 dropoff
                   ? 'border-gray-200 bg-gray-50'
                   : 'border-gray-200 hover:border-gray-300'
@@ -180,7 +180,7 @@ export default function RideBookingCard({ className, compact = false }: RideBook
       </div>
 
       {/* Vehicle Type Selector */}
-      <div className="px-4 pb-5">
+      <div className="px-5 pb-6">
         <p className="text-xs font-medium text-gray-500 mb-3">Vehicle Type</p>
         <VehicleTypeSelector
           selected={vehicleType}
@@ -202,7 +202,7 @@ export default function RideBookingCard({ className, compact = false }: RideBook
       </div>
 
       {/* Action Buttons */}
-      <div className="px-4 py-5 flex gap-3">
+      <div className="px-5 py-6 flex gap-4">
         <button
           onClick={handleSchedule}
           className="flex-1 flex items-center justify-center gap-2 h-12 rounded-xl border-2 border-gray-200 text-gray-700 font-semibold hover:bg-gray-50 active:scale-[0.98] transition-all"
