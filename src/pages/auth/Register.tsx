@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { ArrowLeft, User, Mail, Camera, AlertCircle } from 'lucide-react'
 import { Button, Input, Avatar } from '@/components/ui'
@@ -21,6 +21,11 @@ export default function Register() {
   const [isUploading, setIsUploading] = useState(false)
 
   const { isLoading, error, createUserProfile, clearError, user } = useAuth()
+
+  // Clear any stale errors from previous auth steps when component mounts
+  useEffect(() => {
+    clearError()
+  }, [clearError])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData((prev) => ({

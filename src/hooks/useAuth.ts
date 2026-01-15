@@ -11,6 +11,9 @@ import {
   getStoredConfirmationResult,
   clearStoredConfirmationResult,
   isRecaptchaReady,
+  resetRecaptcha,
+  isRateLimited,
+  getRateLimitRemainingSeconds,
 } from '@/services/firebase/auth'
 import {
   getDocument,
@@ -37,7 +40,7 @@ interface UseAuthReturn {
   isAdmin: boolean
   // Actions
   initializeRecaptcha: (containerId: string) => Promise<boolean>
-  sendVerificationCode: (phone: string) => Promise<boolean>
+  sendVerificationCode: (phone: string, containerId?: string) => Promise<boolean>
   verifyCode: (code: string) => Promise<boolean>
   loginWithGoogle: () => Promise<boolean>
   loginWithFacebook: () => Promise<boolean>
@@ -115,7 +118,7 @@ export function useAuth(): UseAuthReturn {
     }
   }, [])
 
-  const sendVerificationCode = useCallback(async (phone: string): Promise<boolean> => {
+  const sendVerificationCode = useCallback(async (phone: string, containerId?: string): Promise<boolean> => {
     try {
       setLoading(true)
       setError(null)
@@ -127,10 +130,23 @@ export function useAuth(): UseAuthReturn {
         return false
       }
 
-      // Check if reCAPTCHA is ready
-      if (!isRecaptchaReady()) {
-        setError('Security verification not ready. Please wait a moment and try again.')
+      // Check for rate limiting first
+      if (isRateLimited()) {
+        const remaining = getRateLimitRemainingSeconds()
+        const minutes = Math.ceil(remaining / 60)
+        setError(`Too many attempts. Please wait ${minutes} minute${minutes > 1 ? 's' : ''} before trying again.`)
         return false
+      }
+
+      // Check if reCAPTCHA is ready, if not try to re-initialize
+      if (!isRecaptchaReady()) {
+        const recaptchaContainerId = containerId || 'recaptcha-container-login'
+        console.log('[Auth] reCAPTCHA not ready, attempting to initialize...')
+        const initialized = await initRecaptcha(recaptchaContainerId)
+        if (!initialized) {
+          setError('Security verification not ready. Please refresh the page and try again.')
+          return false
+        }
       }
 
       const result = await sendOTP(cleanPhone)
@@ -139,6 +155,15 @@ export function useAuth(): UseAuthReturn {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to send OTP'
       setError(errorMessage)
+
+      // If it's a reCAPTCHA-related error, the auth service already reset it
+      // Signal that reCAPTCHA needs re-initialization for next attempt
+      if (errorMessage.includes('Security verification') ||
+          errorMessage.includes('verification service') ||
+          errorMessage.includes('try again')) {
+        console.log('[Auth] reCAPTCHA error detected, will re-initialize on next attempt')
+      }
+
       return false
     } finally {
       setLoading(false)
@@ -158,6 +183,7 @@ export function useAuth(): UseAuthReturn {
       setLoading(true)
       setError(null)
       const firebaseUser = await activeConfirmation.confirm(code)
+      setError(null) // Clear any previous errors before navigation
       setUser(firebaseUser.user)
       setConfirmationResult(null)
       clearStoredConfirmationResult()
