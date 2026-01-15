@@ -59,18 +59,6 @@ export default function Login() {
     }
   }, [authMode, initializeRecaptcha, recaptchaInitialized])
 
-  // Reset reCAPTCHA state when verification errors occur, allowing re-initialization on retry
-  useEffect(() => {
-    if (error && (
-      error.includes('Security verification') ||
-      error.includes('verification service') ||
-      error.includes('reCAPTCHA') ||
-      error.includes('try again')
-    )) {
-      setRecaptchaInitialized(false)
-    }
-  }, [error])
-
   const handleGoogleSignIn = async () => {
     clearError()
     await loginWithGoogle()

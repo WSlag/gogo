@@ -38,16 +38,12 @@ export default function OTPVerification() {
     }
   }, [isAuthenticated, navigate, returnPath])
 
-  // Track if recaptcha is initialized for resend functionality
-  const [recaptchaReady, setRecaptchaReady] = useState(false)
-
-  // Initialize recaptcha for resend - only if not already initialized
+  // Initialize recaptcha for resend functionality
   useEffect(() => {
     const initRecaptchaForResend = async () => {
       // Small delay to let any existing reCAPTCHA settle
       await new Promise(resolve => setTimeout(resolve, 200))
-      const success = await initializeRecaptcha('recaptcha-container')
-      setRecaptchaReady(success)
+      await initializeRecaptcha('recaptcha-container')
     }
     initRecaptchaForResend()
   }, [initializeRecaptcha])
