@@ -32,10 +32,6 @@ let currentContainerId: string | null = null
 // Store confirmation result at module level to persist across navigation
 let storedConfirmationResult: ConfirmationResult | null = null
 
-// Track rate limit status
-let rateLimitedUntil: number | null = null
-const RATE_LIMIT_DURATION_MS = 5 * 60 * 1000 // 5 minutes
-
 // Get stored confirmation result
 export const getStoredConfirmationResult = (): ConfirmationResult | null => {
   return storedConfirmationResult
@@ -59,23 +55,6 @@ export const resetRecaptcha = (): void => {
   recaptchaVerifier = null
   recaptchaInitialized = false
   currentContainerId = null
-}
-
-// Check if currently rate limited
-export const isRateLimited = (): boolean => {
-  if (!rateLimitedUntil) return false
-  if (Date.now() > rateLimitedUntil) {
-    rateLimitedUntil = null
-    return false
-  }
-  return true
-}
-
-// Get remaining rate limit time in seconds
-export const getRateLimitRemainingSeconds = (): number => {
-  if (!rateLimitedUntil) return 0
-  const remaining = rateLimitedUntil - Date.now()
-  return remaining > 0 ? Math.ceil(remaining / 1000) : 0
 }
 
 // Initialize recaptcha verifier
@@ -225,12 +204,6 @@ export const sendOTP = async (phoneNumber: string): Promise<ConfirmationResult> 
     // Provide user-friendly error messages
     const firebaseError = error as { code?: string; message?: string }
     logError('sendOTP failed', { code: firebaseError.code, message: firebaseError.message })
-
-    // Track rate limiting
-    if (firebaseError.code === 'auth/too-many-requests') {
-      rateLimitedUntil = Date.now() + RATE_LIMIT_DURATION_MS
-      log('Rate limited until', new Date(rateLimitedUntil).toLocaleTimeString())
-    }
 
     // Determine if we need to reset reCAPTCHA for recovery
     const needsRecaptchaReset =

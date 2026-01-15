@@ -12,8 +12,6 @@ import {
   clearStoredConfirmationResult,
   isRecaptchaReady,
   resetRecaptcha,
-  isRateLimited,
-  getRateLimitRemainingSeconds,
 } from '@/services/firebase/auth'
 import {
   getDocument,
@@ -127,14 +125,6 @@ export function useAuth(): UseAuthReturn {
       const cleanPhone = phone.replace(/\D/g, '').replace(/^0/, '')
       if (cleanPhone.length !== 10 || !cleanPhone.startsWith('9')) {
         setError('Please enter a valid Philippine mobile number starting with 9')
-        return false
-      }
-
-      // Check for rate limiting first
-      if (isRateLimited()) {
-        const remaining = getRateLimitRemainingSeconds()
-        const minutes = Math.ceil(remaining / 60)
-        setError(`Too many attempts. Please wait ${minutes} minute${minutes > 1 ? 's' : ''} before trying again.`)
         return false
       }
 
