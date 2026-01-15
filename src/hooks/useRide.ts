@@ -35,17 +35,17 @@ interface Promo {
   applicableServices: string[]
 }
 
-// Vehicle type configurations with pricing
+// Ultra-affordable pricing for Cotabato City market (25-30% lower than Manila rates)
 export const VEHICLE_TYPES: Record<VehicleType, VehicleTypeInfo> = {
   motorcycle: {
     type: 'motorcycle',
     name: 'MC Taxi',
     description: 'Affordable motorcycle ride',
     icon: 'motorcycle',
-    baseFare: 40,
-    perKm: 10,
+    baseFare: 30,
+    perKm: 7,
     perMinute: 1,
-    minFare: 50,
+    minFare: 35,
     capacity: 1,
     estimatedArrival: '3-5 min',
   },
@@ -54,10 +54,10 @@ export const VEHICLE_TYPES: Record<VehicleType, VehicleTypeInfo> = {
     name: 'Car',
     description: 'Comfortable 4-seater',
     icon: 'car',
-    baseFare: 60,
-    perKm: 15,
-    perMinute: 2,
-    minFare: 80,
+    baseFare: 45,
+    perKm: 10,
+    perMinute: 1.5,
+    minFare: 55,
     capacity: 4,
     estimatedArrival: '5-8 min',
   },
@@ -66,11 +66,11 @@ export const VEHICLE_TYPES: Record<VehicleType, VehicleTypeInfo> = {
     name: 'Van',
     description: 'Spacious for groups',
     icon: 'van',
-    baseFare: 100,
-    perKm: 20,
-    perMinute: 3,
-    minFare: 150,
-    capacity: 8,
+    baseFare: 60,
+    perKm: 13,
+    perMinute: 2,
+    minFare: 70,
+    capacity: 6,
     estimatedArrival: '8-12 min',
   },
   delivery: {
@@ -78,10 +78,10 @@ export const VEHICLE_TYPES: Record<VehicleType, VehicleTypeInfo> = {
     name: 'Delivery',
     description: 'Send packages',
     icon: 'truck',
-    baseFare: 50,
-    perKm: 12,
+    baseFare: 35,
+    perKm: 8,
     perMinute: 1,
-    minFare: 60,
+    minFare: 40,
     capacity: 0,
     estimatedArrival: '5-10 min',
   },
@@ -90,10 +90,10 @@ export const VEHICLE_TYPES: Record<VehicleType, VehicleTypeInfo> = {
     name: 'Happy Move',
     description: 'Moving & hauling',
     icon: 'truck',
-    baseFare: 300,
-    perKm: 25,
-    perMinute: 5,
-    minFare: 500,
+    baseFare: 200,
+    perKm: 18,
+    perMinute: 3,
+    minFare: 350,
     capacity: 0,
     estimatedArrival: '15-25 min',
   },
@@ -102,29 +102,29 @@ export const VEHICLE_TYPES: Record<VehicleType, VehicleTypeInfo> = {
     name: 'Airport',
     description: 'Airport transfer',
     icon: 'plane',
-    baseFare: 500,
+    baseFare: 350,
     perKm: 0,
     perMinute: 0,
-    minFare: 500,
+    minFare: 350,
     capacity: 4,
     estimatedArrival: '10-15 min',
   },
 }
 
-// Surge pricing configuration
+// Surge pricing configuration (lower multipliers for price-sensitive Cotabato market)
 const SURGE_CONFIG = {
   // Peak hours (6-9 AM and 5-8 PM)
   peakHours: [
     { start: 6, end: 9 },
     { start: 17, end: 20 },
   ],
-  peakMultiplier: 1.25,
+  peakMultiplier: 1.15,
   // Weekend bonus
-  weekendMultiplier: 1.1,
+  weekendMultiplier: 1.05,
   // Bad weather (would be fetched from API in production)
-  badWeatherMultiplier: 1.5,
+  badWeatherMultiplier: 1.3,
   // High demand (would be calculated from real-time data)
-  highDemandMultiplier: 1.3,
+  highDemandMultiplier: 1.2,
 }
 
 interface LocationInfo {
