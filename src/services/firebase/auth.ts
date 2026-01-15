@@ -32,6 +32,10 @@ let currentContainerId: string | null = null
 // Store confirmation result at module level to persist across navigation
 let storedConfirmationResult: ConfirmationResult | null = null
 
+// Track rate limit status
+let rateLimitedUntil: number | null = null
+const RATE_LIMIT_DURATION_MS = 5 * 60 * 1000 // 5 minutes
+
 // Get stored confirmation result
 export const getStoredConfirmationResult = (): ConfirmationResult | null => {
   return storedConfirmationResult
@@ -40,6 +44,38 @@ export const getStoredConfirmationResult = (): ConfirmationResult | null => {
 // Clear stored confirmation result
 export const clearStoredConfirmationResult = (): void => {
   storedConfirmationResult = null
+}
+
+// Reset reCAPTCHA for recovery after failures
+export const resetRecaptcha = (): void => {
+  log('Resetting reCAPTCHA...')
+  if (recaptchaVerifier) {
+    try {
+      recaptchaVerifier.clear()
+    } catch (e) {
+      log('Error clearing reCAPTCHA during reset (non-critical)', e)
+    }
+  }
+  recaptchaVerifier = null
+  recaptchaInitialized = false
+  currentContainerId = null
+}
+
+// Check if currently rate limited
+export const isRateLimited = (): boolean => {
+  if (!rateLimitedUntil) return false
+  if (Date.now() > rateLimitedUntil) {
+    rateLimitedUntil = null
+    return false
+  }
+  return true
+}
+
+// Get remaining rate limit time in seconds
+export const getRateLimitRemainingSeconds = (): number => {
+  if (!rateLimitedUntil) return 0
+  const remaining = rateLimitedUntil - Date.now()
+  return remaining > 0 ? Math.ceil(remaining / 1000) : 0
 }
 
 // Initialize recaptcha verifier
@@ -190,18 +226,24 @@ export const sendOTP = async (phoneNumber: string): Promise<ConfirmationResult> 
     const firebaseError = error as { code?: string; message?: string }
     logError('sendOTP failed', { code: firebaseError.code, message: firebaseError.message })
 
-    // If reCAPTCHA failed or was removed, clear it so it can be re-initialized
-    if (firebaseError.code === 'auth/captcha-check-failed' ||
-        firebaseError.code === 'auth/invalid-app-credential' ||
-        firebaseError.message?.includes('reCAPTCHA client element has been removed')) {
-      try {
-        recaptchaVerifier?.clear()
-      } catch (e) {
-        log('Error clearing failed reCAPTCHA', e)
-      }
-      recaptchaVerifier = null
-      recaptchaInitialized = false
-      currentContainerId = null
+    // Track rate limiting
+    if (firebaseError.code === 'auth/too-many-requests') {
+      rateLimitedUntil = Date.now() + RATE_LIMIT_DURATION_MS
+      log('Rate limited until', new Date(rateLimitedUntil).toLocaleTimeString())
+    }
+
+    // Determine if we need to reset reCAPTCHA for recovery
+    const needsRecaptchaReset =
+      firebaseError.code === 'auth/captcha-check-failed' ||
+      firebaseError.code === 'auth/invalid-app-credential' ||
+      firebaseError.code === 'auth/error-code:-39' ||
+      firebaseError.message?.includes('reCAPTCHA client element has been removed') ||
+      firebaseError.message?.includes('reCAPTCHA') ||
+      firebaseError.message?.includes('recaptcha')
+
+    if (needsRecaptchaReset) {
+      log('Resetting reCAPTCHA due to verification failure')
+      resetRecaptcha()
     }
 
     // Map Firebase error codes to user-friendly messages
@@ -209,16 +251,17 @@ export const sendOTP = async (phoneNumber: string): Promise<ConfirmationResult> 
       'auth/invalid-phone-number': 'Invalid phone number format. Please enter a valid Philippine mobile number.',
       'auth/too-many-requests': 'Too many attempts. Please wait a few minutes before trying again.',
       'auth/quota-exceeded': 'SMS quota exceeded. Please try again later or contact support.',
-      'auth/captcha-check-failed': 'Security verification failed. Please refresh the page and try again.',
+      'auth/captcha-check-failed': 'Security verification failed. Please try again.',
       'auth/missing-phone-number': 'Please enter your phone number.',
       'auth/operation-not-allowed': 'Phone authentication is not enabled. Please contact support.',
       'auth/network-request-failed': 'Network error. Please check your internet connection.',
-      'auth/invalid-app-credential': 'Security verification failed. Please refresh the page and try again.',
+      'auth/invalid-app-credential': 'Security verification failed. Please try again.',
+      'auth/error-code:-39': 'Phone verification service temporarily unavailable. Please try again.',
     }
 
     // Handle reCAPTCHA element removed error
     if (firebaseError.message?.includes('reCAPTCHA client element has been removed')) {
-      throw new Error('Security verification expired. Please refresh the page and try again.')
+      throw new Error('Security verification expired. Please try again.')
     }
 
     const userMessage = errorMessages[firebaseError.code || ''] || firebaseError.message || 'Failed to send verification code. Please try again.'

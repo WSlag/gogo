@@ -5,24 +5,27 @@
 
 import {
   setDocument,
+  getDocuments,
+  deleteDocument,
   collections,
   GeoPoint,
   Timestamp,
+  where,
 } from '@/services/firebase/firestore'
 
 // Merchant seed data
 const merchants = [
   {
     id: 'merchant-001',
-    name: 'Jollibee - SM Mall of Asia',
+    name: 'Jollibee - KCC Mall Cotabato',
     description: 'The most famous Filipino fast food chain',
     type: 'restaurant',
     category: 'Fast Food',
     cuisine: ['Filipino', 'Fast Food', 'Chicken'],
-    address: 'SM Mall of Asia, Pasay City',
-    coordinates: new GeoPoint(14.5351, 120.9821),
+    address: 'KCC Mall of Cotabato, Cotabato City',
+    coordinates: new GeoPoint(7.2236, 124.2464),
     phone: '+639171234567',
-    email: 'jollibee.moa@example.com',
+    email: 'jollibee.cotabato@example.com',
     rating: 4.5,
     reviewCount: 2500,
     priceRange: '₱',
@@ -47,15 +50,15 @@ const merchants = [
   },
   {
     id: 'merchant-002',
-    name: 'Mang Inasal - Makati',
+    name: 'Mang Inasal - Cotabato',
     description: 'Unlimited rice with grilled chicken',
     type: 'restaurant',
     category: 'Filipino',
     cuisine: ['Filipino', 'BBQ', 'Chicken'],
-    address: 'Glorietta 4, Makati City',
-    coordinates: new GeoPoint(14.5514, 121.0245),
+    address: 'Sinsuat Avenue, Cotabato City',
+    coordinates: new GeoPoint(7.2200, 124.2450),
     phone: '+639181234567',
-    email: 'manginasal.makati@example.com',
+    email: 'manginasal.cotabato@example.com',
     rating: 4.3,
     reviewCount: 1800,
     priceRange: '₱',
@@ -80,15 +83,15 @@ const merchants = [
   },
   {
     id: 'merchant-003',
-    name: 'Chowking - BGC',
+    name: 'Chowking - Cotabato',
     description: 'Chinese-Filipino fast food favorites',
     type: 'restaurant',
     category: 'Chinese',
     cuisine: ['Chinese', 'Filipino', 'Dim Sum'],
-    address: 'Bonifacio High Street, BGC',
-    coordinates: new GeoPoint(14.5494, 121.0569),
+    address: 'Makakua Street, Cotabato City',
+    coordinates: new GeoPoint(7.2180, 124.2420),
     phone: '+639191234567',
-    email: 'chowking.bgc@example.com',
+    email: 'chowking.cotabato@example.com',
     rating: 4.2,
     reviewCount: 1200,
     priceRange: '₱',
@@ -113,18 +116,18 @@ const merchants = [
   },
   {
     id: 'merchant-004',
-    name: 'Starbucks - Ayala Triangle',
-    description: 'Premium coffee and beverages',
+    name: 'Kape Kutawato',
+    description: 'Local coffee shop serving Mindanao brews and pastries',
     type: 'restaurant',
     category: 'Coffee & Tea',
-    cuisine: ['Coffee', 'Beverages', 'Pastries'],
-    address: 'Ayala Triangle Gardens, Makati',
-    coordinates: new GeoPoint(14.5567, 121.0234),
+    cuisine: ['Coffee', 'Beverages', 'Pastries', 'Local'],
+    address: 'Quezon Avenue, Cotabato City',
+    coordinates: new GeoPoint(7.2150, 124.2500),
     phone: '+639201234567',
-    email: 'starbucks.ayala@example.com',
-    rating: 4.6,
-    reviewCount: 3200,
-    priceRange: '₱₱₱',
+    email: 'kapekutawato@example.com',
+    rating: 4.5,
+    reviewCount: 580,
+    priceRange: '₱₱',
     deliveryFee: 49,
     deliveryTime: '15-25 min',
     minOrder: 200,
@@ -146,15 +149,15 @@ const merchants = [
   },
   {
     id: 'merchant-005',
-    name: "McDonald's - Greenbelt",
+    name: "McDonald's - Cotabato",
     description: 'World famous burgers and fries',
     type: 'restaurant',
     category: 'Fast Food',
     cuisine: ['Fast Food', 'Burgers', 'American'],
-    address: 'Greenbelt 3, Makati City',
-    coordinates: new GeoPoint(14.5520, 121.0195),
+    address: 'Don Rufino Alonzo Street, Cotabato City',
+    coordinates: new GeoPoint(7.2100, 124.2480),
     phone: '+639211234567',
-    email: 'mcdo.greenbelt@example.com',
+    email: 'mcdo.cotabato@example.com',
     rating: 4.4,
     reviewCount: 2800,
     priceRange: '₱',
@@ -179,15 +182,15 @@ const merchants = [
   },
   {
     id: 'merchant-006',
-    name: 'Tokyo Tokyo - SM Megamall',
-    description: 'Japanese bento and rice bowls',
+    name: 'Greenwich - KCC Mall Cotabato',
+    description: 'Pizza, pasta, and Filipino favorites',
     type: 'restaurant',
-    category: 'Japanese',
-    cuisine: ['Japanese', 'Bento', 'Rice Bowls'],
-    address: 'SM Megamall, Mandaluyong',
-    coordinates: new GeoPoint(14.5854, 121.0566),
+    category: 'Pizza',
+    cuisine: ['Pizza', 'Pasta', 'Filipino'],
+    address: 'KCC Mall of Cotabato, Cotabato City',
+    coordinates: new GeoPoint(7.2230, 124.2460),
     phone: '+639221234567',
-    email: 'tokyotokyo.mega@example.com',
+    email: 'greenwich.cotabato@example.com',
     rating: 4.3,
     reviewCount: 980,
     priceRange: '₱₱',
@@ -2176,6 +2179,105 @@ export interface SeedProgress {
   status: 'idle' | 'seeding' | 'success' | 'error'
   message: string
   progress: number
+}
+
+// Helper to clear all documents of a specific type before seeding
+async function clearMerchantsByType(
+  type: 'restaurant' | 'grocery' | 'pharmacy',
+  onProgress?: (message: string) => void
+): Promise<number> {
+  const existingMerchants = await getDocuments(collections.merchants, [
+    where('type', '==', type),
+  ])
+
+  let deletedCount = 0
+  for (const merchant of existingMerchants) {
+    await deleteDocument(collections.merchants, merchant.id as string)
+    deletedCount++
+    onProgress?.(`Deleted ${type} merchant: ${(merchant as { name?: string }).name || merchant.id}`)
+  }
+
+  return deletedCount
+}
+
+// Clear all products for merchants of a specific type
+async function clearProductsByMerchantIds(
+  merchantIds: string[],
+  onProgress?: (message: string) => void
+): Promise<number> {
+  if (merchantIds.length === 0) return 0
+
+  let deletedCount = 0
+  for (const merchantId of merchantIds) {
+    const products = await getDocuments(collections.products, [
+      where('merchantId', '==', merchantId),
+    ])
+
+    for (const product of products) {
+      await deleteDocument(collections.products, product.id as string)
+      deletedCount++
+    }
+    onProgress?.(`Deleted ${products.length} products for merchant: ${merchantId}`)
+  }
+
+  return deletedCount
+}
+
+export async function clearAndSeedDatabase(
+  onProgress?: (progress: SeedProgress) => void
+): Promise<void> {
+  const updateProgress = (status: SeedProgress['status'], message: string, progress: number) => {
+    onProgress?.({ status, message, progress })
+  }
+
+  try {
+    updateProgress('seeding', 'Clearing existing data...', 0)
+
+    // Get existing merchant IDs for each type before deleting
+    const existingRestaurants = await getDocuments(collections.merchants, [
+      where('type', '==', 'restaurant'),
+    ])
+    const existingGrocery = await getDocuments(collections.merchants, [
+      where('type', '==', 'grocery'),
+    ])
+    const existingPharmacy = await getDocuments(collections.merchants, [
+      where('type', '==', 'pharmacy'),
+    ])
+
+    const allExistingMerchantIds = [
+      ...existingRestaurants.map(m => m.id as string),
+      ...existingGrocery.map(m => m.id as string),
+      ...existingPharmacy.map(m => m.id as string),
+    ]
+
+    // Clear products first
+    updateProgress('seeding', 'Clearing existing products...', 5)
+    const deletedProducts = await clearProductsByMerchantIds(
+      allExistingMerchantIds,
+      (msg) => updateProgress('seeding', msg, 10)
+    )
+    updateProgress('seeding', `Cleared ${deletedProducts} existing products`, 15)
+
+    // Clear merchants
+    updateProgress('seeding', 'Clearing existing merchants...', 20)
+    const deletedRestaurants = await clearMerchantsByType('restaurant', (msg) => updateProgress('seeding', msg, 22))
+    const deletedGrocery = await clearMerchantsByType('grocery', (msg) => updateProgress('seeding', msg, 24))
+    const deletedPharmacy = await clearMerchantsByType('pharmacy', (msg) => updateProgress('seeding', msg, 26))
+
+    updateProgress('seeding', `Cleared ${deletedRestaurants + deletedGrocery + deletedPharmacy} existing merchants`, 30)
+
+    // Now seed the new data
+    await seedDatabase((progress) => {
+      // Remap progress from 0-100 to 30-100
+      const remappedProgress = 30 + (progress.progress * 0.7)
+      updateProgress(progress.status, progress.message, remappedProgress)
+    })
+
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error occurred'
+    updateProgress('error', `Failed to clear and seed database: ${message}`, 0)
+    throw error
+  }
 }
 
 export async function seedDatabase(

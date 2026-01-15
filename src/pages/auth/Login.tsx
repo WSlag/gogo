@@ -44,7 +44,7 @@ export default function Login() {
     }
   }, [isAuthenticated, navigate, from])
 
-  // Initialize reCAPTCHA when phone mode is active (only once)
+  // Initialize reCAPTCHA when phone mode is active
   const [recaptchaInitialized, setRecaptchaInitialized] = useState(false)
 
   useEffect(() => {
@@ -58,6 +58,18 @@ export default function Login() {
       return () => clearTimeout(timer)
     }
   }, [authMode, initializeRecaptcha, recaptchaInitialized])
+
+  // Reset reCAPTCHA state when verification errors occur, allowing re-initialization on retry
+  useEffect(() => {
+    if (error && (
+      error.includes('Security verification') ||
+      error.includes('verification service') ||
+      error.includes('reCAPTCHA') ||
+      error.includes('try again')
+    )) {
+      setRecaptchaInitialized(false)
+    }
+  }, [error])
 
   const handleGoogleSignIn = async () => {
     clearError()
@@ -74,7 +86,8 @@ export default function Login() {
       return
     }
 
-    const success = await sendVerificationCode(cleanPhone)
+    // Pass the container ID so reCAPTCHA can be re-initialized if needed
+    const success = await sendVerificationCode(cleanPhone, 'recaptcha-container-login')
     if (success) {
       navigate('/auth/otp', {
         state: {

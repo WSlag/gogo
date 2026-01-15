@@ -26,7 +26,10 @@
       "Bash(npx firebase deploy:*)",
       "Bash(ls -la \"c:\\\\Users\\\\Administrator\\\\GOGO\\\\src\\\\pages\\\\grocery\"\" 2>/dev/null || echo \"Directory does not exist \")",
       "Bash(npx eslint:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ]
   }
 }

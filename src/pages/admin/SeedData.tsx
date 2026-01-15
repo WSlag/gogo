@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Database, CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
+import { ArrowLeft, Database, CheckCircle, AlertCircle, Loader2, Trash2 } from 'lucide-react'
 import { Button, Card } from '@/components/ui'
-import { seedDatabase, seedDataCounts, type SeedProgress } from '@/utils/seedData'
+import { seedDatabase, clearAndSeedDatabase, seedDataCounts, type SeedProgress } from '@/utils/seedData'
 
 export default function SeedData() {
   const navigate = useNavigate()
@@ -17,6 +17,14 @@ export default function SeedData() {
       await seedDatabase(setProgress)
     } catch (error) {
       console.error('Seed failed:', error)
+    }
+  }
+
+  const handleClearAndSeed = async () => {
+    try {
+      await clearAndSeedDatabase(setProgress)
+    } catch (error) {
+      console.error('Clear and seed failed:', error)
     }
   }
 
@@ -80,27 +88,27 @@ export default function SeedData() {
           <div className="space-y-2 text-sm">
             <div className="flex items-center gap-2">
               <span className="w-6 h-6 bg-red-100 rounded-full flex items-center justify-center text-xs">JB</span>
-              <span>Jollibee - SM Mall of Asia</span>
+              <span>Jollibee - KCC Mall Cotabato</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="w-6 h-6 bg-orange-100 rounded-full flex items-center justify-center text-xs">MI</span>
-              <span>Mang Inasal - Makati</span>
+              <span>Mang Inasal - Cotabato</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="w-6 h-6 bg-yellow-100 rounded-full flex items-center justify-center text-xs">CK</span>
-              <span>Chowking - BGC</span>
+              <span>Chowking - Cotabato</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center text-xs">SB</span>
-              <span>Starbucks - Ayala Triangle</span>
+              <span className="w-6 h-6 bg-amber-100 rounded-full flex items-center justify-center text-xs">KK</span>
+              <span>Kape Kutawato (Local Coffee)</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="w-6 h-6 bg-yellow-100 rounded-full flex items-center justify-center text-xs">MD</span>
-              <span>McDonald's - Greenbelt</span>
+              <span>McDonald's - Cotabato</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="w-6 h-6 bg-red-100 rounded-full flex items-center justify-center text-xs">TT</span>
-              <span>Tokyo Tokyo - SM Megamall</span>
+              <span className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center text-xs">GW</span>
+              <span>Greenwich - KCC Mall Cotabato</span>
             </div>
           </div>
         </Card>
@@ -196,8 +204,33 @@ export default function SeedData() {
 
         {/* Actions */}
         <div className="space-y-3">
+          {/* Primary action - Clear and Reseed */}
           <Button
             fullWidth
+            onClick={handleClearAndSeed}
+            disabled={progress.status === 'seeding'}
+            className="bg-red-600 hover:bg-red-700"
+          >
+            {progress.status === 'seeding' ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Processing...
+              </>
+            ) : (
+              <>
+                <Trash2 className="h-4 w-4 mr-2" />
+                Clear & Reseed Database
+              </>
+            )}
+          </Button>
+          <p className="text-xs text-gray-500 text-center">
+            Recommended: Deletes all existing merchants & products, then seeds fresh Cotabato City data
+          </p>
+
+          {/* Secondary action - Just add */}
+          <Button
+            fullWidth
+            variant="outline"
             onClick={handleSeed}
             disabled={progress.status === 'seeding'}
           >
@@ -207,9 +240,9 @@ export default function SeedData() {
                 Seeding Database...
               </>
             ) : progress.status === 'success' ? (
-              'Seed Again'
+              'Seed Again (Add Only)'
             ) : (
-              'Seed Database'
+              'Seed Database (Add Only)'
             )}
           </Button>
 
