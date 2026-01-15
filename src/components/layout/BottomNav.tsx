@@ -1,7 +1,8 @@
+import { useEffect } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { Home, Search, Package, User } from 'lucide-react'
 import { cn } from '@/utils/cn'
-import { useCartStore } from '@/store'
+import { useAuthStore, useOrderStore } from '@/store'
 
 interface NavItem {
   path: string
@@ -18,7 +19,18 @@ const navItems: NavItem[] = [
 
 export function BottomNav() {
   const location = useLocation()
-  const itemCount = useCartStore((state) => state.itemCount)
+  const { user, profile } = useAuthStore()
+  const activeOrderCount = useOrderStore((state) => state.activeOrderCount)
+  const subscribeToActiveOrders = useOrderStore((state) => state.subscribeToActiveOrders)
+
+  // Subscribe to active orders when user is logged in
+  useEffect(() => {
+    const customerId = user?.uid || profile?.id
+    if (!customerId) return
+
+    const unsubscribe = subscribeToActiveOrders()
+    return () => unsubscribe()
+  }, [user?.uid, profile?.id, subscribeToActiveOrders])
 
   // Hide bottom nav on certain routes
   const hiddenRoutes = ['/auth', '/ride/tracking', '/order/tracking']
@@ -55,9 +67,9 @@ export function BottomNav() {
                     strokeWidth={isActive ? 2.5 : 2}
                   />
                 </div>
-                {item.path === '/orders' && itemCount > 0 && (
+                {item.path === '/orders' && activeOrderCount > 0 && (
                   <span className="absolute -right-1 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary-600 text-[10px] font-bold text-white shadow-sm">
-                    {itemCount > 9 ? '9+' : itemCount}
+                    {activeOrderCount > 9 ? '9+' : activeOrderCount}
                   </span>
                 )}
               </div>
