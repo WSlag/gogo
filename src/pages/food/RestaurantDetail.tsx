@@ -330,13 +330,15 @@ export default function RestaurantDetail() {
       {/* Search Bar */}
       <div className="bg-white px-4 pb-4">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+          {!searchQuery && (
+            <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+          )}
           <input
             type="text"
             placeholder="Search menu..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-xl bg-gray-100 py-3 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className={`w-full rounded-xl bg-gray-100 py-3 ${searchQuery ? 'pl-4' : 'pl-10'} pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500`}
           />
         </div>
       </div>

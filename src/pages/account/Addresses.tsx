@@ -377,7 +377,9 @@ export default function Addresses() {
               Address
             </label>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+              {!(searchQuery || formData.address) && (
+                <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+              )}
               <input
                 type="text"
                 value={searchQuery || formData.address}
@@ -386,7 +388,7 @@ export default function Addresses() {
                   setFormData({ ...formData, address: e.target.value })
                 }}
                 placeholder="Search for address"
-                className="w-full rounded-lg border border-gray-200 py-3 pl-10 pr-4 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+                className={`w-full rounded-lg border border-gray-200 py-3 ${searchQuery || formData.address ? 'pl-4' : 'pl-10'} pr-4 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20`}
               />
             </div>
 

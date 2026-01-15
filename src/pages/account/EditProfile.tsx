@@ -119,12 +119,14 @@ export default function EditProfile() {
                 First Name
               </label>
               <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                {!formData.firstName && (
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                )}
                 <input
                   type="text"
                   value={formData.firstName}
                   onChange={(e) => handleInputChange('firstName', e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                  className={`w-full ${formData.firstName ? 'pl-4' : 'pl-10'} pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors`}
                   placeholder="Enter first name"
                 />
               </div>
@@ -136,12 +138,14 @@ export default function EditProfile() {
                 Last Name
               </label>
               <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                {!formData.lastName && (
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                )}
                 <input
                   type="text"
                   value={formData.lastName}
                   onChange={(e) => handleInputChange('lastName', e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                  className={`w-full ${formData.lastName ? 'pl-4' : 'pl-10'} pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors`}
                   placeholder="Enter last name"
                 />
               </div>
@@ -153,12 +157,14 @@ export default function EditProfile() {
                 Phone Number
               </label>
               <div className="relative">
-                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                {!formData.phone && (
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                )}
                 <input
                   type="tel"
                   value={formData.phone}
                   onChange={(e) => handleInputChange('phone', e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors bg-gray-50"
+                  className={`w-full ${formData.phone ? 'pl-4' : 'pl-10'} pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors bg-gray-50`}
                   placeholder="Enter phone number"
                   disabled
                 />
@@ -172,12 +178,14 @@ export default function EditProfile() {
                 Email Address
               </label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                {!formData.email && (
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                )}
                 <input
                   type="email"
                   value={formData.email}
                   onChange={(e) => handleInputChange('email', e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                  className={`w-full ${formData.email ? 'pl-4' : 'pl-10'} pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors`}
                   placeholder="Enter email address"
                 />
               </div>

@@ -39,6 +39,7 @@ export interface InputProps
   rightIcon?: ReactNode
   leftAddon?: ReactNode
   rightAddon?: ReactNode
+  hideIconOnValue?: boolean
 }
 
 const Input = forwardRef<HTMLInputElement, InputProps>(
@@ -54,6 +55,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
       rightIcon,
       leftAddon,
       rightAddon,
+      hideIconOnValue,
       type = 'text',
       id,
       ...props
@@ -61,6 +63,9 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
     ref
   ) => {
     const inputId = id || props.name
+    const hasValue = props.value !== undefined && props.value !== ''
+    const showLeftIcon = leftIcon && (!hideIconOnValue || !hasValue)
+    const showRightIcon = rightIcon && (!hideIconOnValue || !hasValue)
 
     return (
       <div className="w-full">
@@ -81,7 +86,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
           )}
 
           <div className="relative flex-1">
-            {leftIcon && (
+            {showLeftIcon && (
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                 {leftIcon}
               </span>
@@ -95,8 +100,8 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
                   variant: error ? 'error' : variant,
                   inputSize,
                 }),
-                leftIcon && 'pl-10',
-                rightIcon && 'pr-10',
+                showLeftIcon && 'pl-10',
+                showRightIcon && 'pr-10',
                 leftAddon && 'rounded-l-none',
                 rightAddon && 'rounded-r-none',
                 className
@@ -105,7 +110,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
               {...props}
             />
 
-            {rightIcon && (
+            {showRightIcon && (
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
                 {rightIcon}
               </span>

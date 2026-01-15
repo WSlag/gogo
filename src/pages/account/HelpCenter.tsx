@@ -181,13 +181,15 @@ export default function HelpCenter() {
       <div className="p-4 space-y-4">
         {/* Search */}
         <div className="relative">
-          <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+          {!searchQuery && (
+            <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+          )}
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search for help..."
-            className="w-full rounded-xl border border-gray-200 bg-white py-3 pl-12 pr-4 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+            className={`w-full rounded-xl border border-gray-200 bg-white py-3 ${searchQuery ? 'pl-4' : 'pl-12'} pr-4 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20`}
           />
         </div>
 

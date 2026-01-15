@@ -99,13 +99,15 @@ export default function PharmacyHome() {
 
             {/* Search Input - Pill style */}
             <div className="relative flex-1">
-              <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+              {!searchQuery && (
+                <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+              )}
               <input
                 type="text"
                 placeholder="Search medicines, vitamins..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-12 w-full rounded-full bg-gray-100 pl-12 pr-4 text-sm text-gray-900 placeholder-gray-500 outline-none transition-all focus:bg-white focus:ring-2 focus:ring-primary-300"
+                className={`h-12 w-full rounded-full bg-gray-100 ${searchQuery ? 'pl-4' : 'pl-12'} pr-4 text-sm text-gray-900 placeholder-gray-500 outline-none transition-all focus:bg-white focus:ring-2 focus:ring-primary-300`}
               />
             </div>
           </div>
