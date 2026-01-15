@@ -9,9 +9,9 @@ import {
   ToggleLeft,
   ToggleRight,
   Image,
-  DollarSign,
   Tag,
 } from 'lucide-react'
+import { PesoSign } from '@/components/icons'
 import { Button, Card, Modal, Input, Spinner } from '@/components/ui'
 
 interface MenuItem {
@@ -237,7 +237,7 @@ export default function MerchantMenu() {
       </div>
 
       {/* Search */}
-      <div className="bg-white border-b px-4 py-3 sticky top-0 z-10">
+      <div className="bg-white border-b px-4 py-3 sticky top-0 z-30 lg:top-16">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
           <input
@@ -392,7 +392,7 @@ export default function MerchantMenu() {
                 Price *
               </label>
               <div className="relative">
-                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <PesoSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
                   type="number"
                   value={formData.price}
@@ -407,7 +407,7 @@ export default function MerchantMenu() {
                 Compare Price
               </label>
               <div className="relative">
-                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <PesoSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
                   type="number"
                   value={formData.comparePrice}

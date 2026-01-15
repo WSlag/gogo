@@ -2,110 +2,120 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Power,
-  MapPin,
   Car,
   Package,
-  DollarSign,
   Star,
   Clock,
   TrendingUp,
-  ChevronRight,
   Bell,
+  BellRing,
   User,
   Navigation,
   CheckCircle2,
   XCircle,
+  MapPin,
+  AlertCircle,
+  Bike,
+  ChevronRight,
+  Store,
+  Phone,
 } from 'lucide-react'
+import { PesoSign } from '@/components/icons'
 import { Button, Card, Spinner, Modal } from '@/components/ui'
-import { useAuthStore } from '@/store/authStore'
-import type { Driver, DriverStatus } from '@/types'
-
-// Mock driver data
-const MOCK_DRIVER: Driver = {
-  id: 'driver_001',
-  userId: 'user_001',
-  firstName: 'Juan',
-  lastName: 'Dela Cruz',
-  phone: '+639123456789',
-  profileImage: 'https://randomuser.me/api/portraits/men/32.jpg',
-  vehicleType: 'motorcycle',
-  vehicle: {
-    type: 'motorcycle',
-    make: 'Honda',
-    model: 'Click 125i',
-    year: 2022,
-    color: 'Black',
-    plateNumber: 'ABC 1234',
-    registrationExpiry: { toDate: () => new Date('2025-12-31') } as any,
-  },
-  license: {
-    number: 'N01-23-456789',
-    expiry: { toDate: () => new Date('2025-06-30') } as any,
-    type: 'Professional',
-  },
-  documents: {},
-  rating: 4.8,
-  totalRides: 1250,
-  totalDeliveries: 380,
-  status: 'offline',
-  earnings: {
-    today: 1250,
-    thisWeek: 8500,
-    thisMonth: 35000,
-    total: 425000,
-    pendingPayout: 8500,
-  },
-  acceptanceRate: 92,
-  cancellationRate: 3,
-  verified: true,
-  createdAt: { toDate: () => new Date() } as any,
-  updatedAt: { toDate: () => new Date() } as any,
-}
-
-interface PendingRequest {
-  id: string
-  type: 'ride' | 'delivery'
-  pickup: string
-  dropoff: string
-  distance: string
-  estimatedEarnings: number
-  customerName: string
-  expiresIn: number
-}
-
-const MOCK_REQUEST: PendingRequest = {
-  id: 'req_001',
-  type: 'ride',
-  pickup: 'SM City Cotabato',
-  dropoff: 'Notre Dame University',
-  distance: '3.2 km',
-  estimatedEarnings: 85,
-  customerName: 'Maria S.',
-  expiresIn: 30,
-}
+import { useDriver, usePushNotifications, useDriverDeliveries } from '@/hooks'
+import { VehicleIcon } from '@/components/ui/VehicleIcon'
+import type { Order } from '@/types'
 
 export default function DriverDashboard() {
   const navigate = useNavigate()
-  const { profile } = useAuthStore()
+  const {
+    driver,
+    isLoading,
+    error,
+    isOnline,
+    pendingRide,
+    activeRide,
+    earnings,
+    todayStats,
+    goOnline,
+    goOffline,
+    acceptRide,
+    declineRide,
+  } = useDriver()
 
-  const [driver, setDriver] = useState<Driver>(MOCK_DRIVER)
-  const [isOnline, setIsOnline] = useState(false)
-  const [pendingRequest, setPendingRequest] = useState<PendingRequest | null>(null)
   const [showRequestModal, setShowRequestModal] = useState(false)
+  const [showNotificationPrompt, setShowNotificationPrompt] = useState(false)
+  const [showDeliveryModal, setShowDeliveryModal] = useState(false)
+  const [selectedDelivery, setSelectedDelivery] = useState<Order | null>(null)
   const [requestTimer, setRequestTimer] = useState(30)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isToggling, setIsToggling] = useState(false)
+  const [isAccepting, setIsAccepting] = useState(false)
+  const [isAcceptingDelivery, setIsAcceptingDelivery] = useState(false)
 
-  // Simulate incoming request when online
+  // Food/Grocery deliveries
+  const {
+    availableDeliveries,
+    activeDelivery,
+    isLoading: isLoadingDeliveries,
+    acceptDelivery,
+  } = useDriverDeliveries()
+
+  // Push notifications
+  const {
+    isSupported: pushSupported,
+    permission: pushPermission,
+    requestPermission,
+    subscribe: subscribePush,
+  } = usePushNotifications()
+
+  // Show notification permission prompt when going online
   useEffect(() => {
-    if (isOnline && !pendingRequest) {
-      const timer = setTimeout(() => {
-        setPendingRequest(MOCK_REQUEST)
-        setShowRequestModal(true)
-        setRequestTimer(30)
-      }, 5000)
-      return () => clearTimeout(timer)
+    if (isOnline && pushSupported && pushPermission === 'default') {
+      setShowNotificationPrompt(true)
     }
-  }, [isOnline, pendingRequest])
+  }, [isOnline, pushSupported, pushPermission])
+
+  // Send browser notification when new ride request comes in
+  useEffect(() => {
+    if (pendingRide && pushPermission === 'granted') {
+      // Play notification sound
+      const audio = new Audio('/sounds/notification.mp3')
+      audio.play().catch(() => {}) // Ignore error if no sound file
+
+      // Show browser notification
+      new Notification('New Ride Request!', {
+        body: `₱${pendingRide.fare?.total?.toFixed(2) || '0'} - ${pendingRide.pickup?.address?.substring(0, 50) || 'Pickup location'}`,
+        icon: '/icons/icon-192x192.png',
+        badge: '/icons/icon-72x72.png',
+        tag: 'ride-request',
+        requireInteraction: true,
+      })
+    }
+  }, [pendingRide?.id, pushPermission])
+
+  // Show modal when there's a pending ride
+  useEffect(() => {
+    if (pendingRide) {
+      setShowRequestModal(true)
+      setRequestTimer(30)
+    } else {
+      setShowRequestModal(false)
+    }
+  }, [pendingRide])
+
+  // Navigate to active ride when one is accepted
+  useEffect(() => {
+    if (activeRide && (activeRide.status === 'accepted' || activeRide.status === 'arriving' || activeRide.status === 'arrived' || activeRide.status === 'in_progress')) {
+      navigate('/driver/active')
+    }
+  }, [activeRide?.id, activeRide?.status, navigate])
+
+  // Navigate to active delivery when one is accepted
+  useEffect(() => {
+    if (activeDelivery) {
+      navigate('/driver/delivery')
+    }
+  }, [activeDelivery?.id, navigate])
 
   // Request countdown timer
   useEffect(() => {
@@ -114,61 +124,120 @@ export default function DriverDashboard() {
         setRequestTimer((prev) => prev - 1)
       }, 1000)
       return () => clearInterval(interval)
-    } else if (requestTimer === 0) {
+    } else if (requestTimer === 0 && pendingRide) {
       handleDeclineRequest()
     }
-  }, [showRequestModal, requestTimer])
+  }, [showRequestModal, requestTimer, pendingRide])
 
-  const toggleOnline = () => {
-    setIsLoading(true)
-    setTimeout(() => {
-      setIsOnline(!isOnline)
-      setDriver((prev) => ({
-        ...prev,
-        status: !isOnline ? 'online' : 'offline',
-      }))
-      setIsLoading(false)
-    }, 1000)
+  const toggleOnline = async () => {
+    setIsToggling(true)
+    try {
+      if (isOnline) {
+        await goOffline()
+      } else {
+        await goOnline()
+      }
+    } finally {
+      setIsToggling(false)
+    }
   }
 
-  const handleAcceptRequest = () => {
-    setShowRequestModal(false)
-    // Navigate to active ride/delivery screen
-    navigate('/driver/active')
+  const handleAcceptRequest = async () => {
+    if (!pendingRide) return
+    setIsAccepting(true)
+    try {
+      const success = await acceptRide(pendingRide.id)
+      if (success) {
+        setShowRequestModal(false)
+        navigate('/driver/active')
+      }
+    } finally {
+      setIsAccepting(false)
+    }
   }
 
-  const handleDeclineRequest = () => {
-    setPendingRequest(null)
+  const handleDeclineRequest = async () => {
+    if (!pendingRide) return
+    await declineRide(pendingRide.id)
     setShowRequestModal(false)
     setRequestTimer(30)
+  }
+
+  const handleViewDelivery = (order: Order) => {
+    setSelectedDelivery(order)
+    setShowDeliveryModal(true)
+  }
+
+  const handleAcceptDelivery = async () => {
+    if (!selectedDelivery) return
+    setIsAcceptingDelivery(true)
+    try {
+      const success = await acceptDelivery(selectedDelivery.id)
+      if (success) {
+        setShowDeliveryModal(false)
+        setSelectedDelivery(null)
+        navigate('/driver/delivery')
+      }
+    } finally {
+      setIsAcceptingDelivery(false)
+    }
+  }
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Spinner size="lg" />
+      </div>
+    )
+  }
+
+  // No driver profile
+  if (!driver) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-4">
+        <Card className="text-center py-8">
+          <AlertCircle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            Driver Profile Not Found
+          </h2>
+          <p className="text-gray-600 mb-4">
+            You need to register as a driver to access this dashboard.
+          </p>
+          <Button onClick={() => navigate('/driver/register')}>
+            Register as Driver
+          </Button>
+        </Card>
+      </div>
+    )
   }
 
   const stats = [
     {
       label: "Today's Earnings",
-      value: `₱${driver.earnings.today.toLocaleString()}`,
-      icon: DollarSign,
+      value: `₱${earnings.today.toLocaleString()}`,
+      icon: PesoSign,
       color: 'text-green-600',
       bgColor: 'bg-green-50',
     },
     {
       label: 'Completed Today',
-      value: '8',
+      value: todayStats.completedRides.toString(),
       icon: CheckCircle2,
       color: 'text-blue-600',
       bgColor: 'bg-blue-50',
     },
     {
       label: 'Rating',
-      value: driver.rating.toFixed(1),
+      value: driver.rating?.toFixed(1) || '0.0',
       icon: Star,
       color: 'text-yellow-600',
       bgColor: 'bg-yellow-50',
     },
     {
-      label: 'Online Hours',
-      value: '6.5h',
-      icon: Clock,
+      label: 'Total Rides',
+      value: driver.totalRides?.toLocaleString() || '0',
+      icon: Car,
       color: 'text-purple-600',
       bgColor: 'bg-purple-50',
     },
@@ -181,22 +250,25 @@ export default function DriverDashboard() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <img
-              src={driver.profileImage}
+              src={driver.profileImage || `https://api.dicebear.com/7.x/avataaars/svg?seed=${driver.firstName}`}
               alt={driver.firstName}
               className="h-12 w-12 rounded-full border-2 border-white/30 object-cover"
             />
             <div>
               <h1 className="font-semibold">{driver.firstName} {driver.lastName}</h1>
               <div className="flex items-center gap-1 text-sm text-primary-100">
-                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                <span>{driver.rating}</span>
+                <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                <span>{driver.rating?.toFixed(1) || '0.0'}</span>
                 <span className="mx-1">•</span>
-                <span>{driver.vehicle.plateNumber}</span>
+                <span>{driver.vehicle?.plateNumber || 'N/A'}</span>
               </div>
             </div>
           </div>
           <div className="flex gap-2">
-            <button className="rounded-full bg-white/10 p-2 hover:bg-white/20">
+            <button
+              onClick={() => navigate('/notifications')}
+              className="rounded-full bg-white/10 p-2 hover:bg-white/20"
+            >
               <Bell className="h-5 w-5" />
             </button>
             <button
@@ -211,14 +283,14 @@ export default function DriverDashboard() {
         {/* Online Toggle */}
         <button
           onClick={toggleOnline}
-          disabled={isLoading}
+          disabled={isToggling}
           className={`flex w-full items-center justify-center gap-3 rounded-xl py-4 font-semibold transition ${
             isOnline
               ? 'bg-green-500 text-white'
               : 'bg-white text-gray-900'
           }`}
         >
-          {isLoading ? (
+          {isToggling ? (
             <Spinner size="sm" />
           ) : (
             <>
@@ -230,12 +302,20 @@ export default function DriverDashboard() {
       </div>
 
       {/* Status Banner */}
-      {isOnline && (
+      {isOnline && !activeRide && (
         <div className="bg-green-50 px-4 py-3 flex items-center gap-2 border-b border-green-100">
           <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
           <span className="text-sm text-green-700">
             Waiting for ride requests...
           </span>
+        </div>
+      )}
+
+      {/* Error Banner */}
+      {error && (
+        <div className="bg-error-light px-4 py-3 flex items-center gap-2 border-b border-red-100">
+          <AlertCircle className="h-5 w-5 text-error" />
+          <span className="text-sm text-error">{error}</span>
         </div>
       )}
 
@@ -260,6 +340,53 @@ export default function DriverDashboard() {
           })}
         </div>
 
+        {/* Available Deliveries */}
+        {availableDeliveries.length > 0 && (
+          <Card className="!border-orange-200 !bg-orange-50">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Package className="h-5 w-5 text-orange-600" />
+                <h3 className="font-semibold text-gray-900">Available Deliveries</h3>
+              </div>
+              <span className="px-2 py-1 bg-orange-100 text-orange-700 text-xs font-medium rounded-full">
+                {availableDeliveries.length} orders
+              </span>
+            </div>
+            <div className="space-y-2">
+              {availableDeliveries.slice(0, 3).map((order) => (
+                <button
+                  key={order.id}
+                  onClick={() => handleViewDelivery(order)}
+                  className="w-full flex items-center justify-between p-3 bg-white rounded-lg border border-orange-100 hover:border-orange-300 transition"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-orange-100 flex items-center justify-center">
+                      <Store className="h-5 w-5 text-orange-600" />
+                    </div>
+                    <div className="text-left">
+                      <p className="font-medium text-gray-900 text-sm">
+                        {order.merchantName || `${order.type === 'grocery' ? 'Grocery' : order.type === 'pharmacy' ? 'Pharmacy' : 'Food'} Order`}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {order.items?.length || 0} items • Ready for pickup
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-green-600">₱{order.deliveryFee || 0}</span>
+                    <ChevronRight className="h-5 w-5 text-gray-400" />
+                  </div>
+                </button>
+              ))}
+              {availableDeliveries.length > 3 && (
+                <p className="text-center text-sm text-gray-500 pt-2">
+                  +{availableDeliveries.length - 3} more deliveries available
+                </p>
+              )}
+            </div>
+          </Card>
+        )}
+
         {/* Quick Actions */}
         <Card>
           <h3 className="font-semibold text-gray-900 mb-3">Quick Actions</h3>
@@ -268,7 +395,7 @@ export default function DriverDashboard() {
               onClick={() => navigate('/driver/earnings')}
               className="flex flex-col items-center gap-1 rounded-lg bg-gray-50 p-3 hover:bg-gray-100"
             >
-              <DollarSign className="h-6 w-6 text-green-600" />
+              <PesoSign className="h-6 w-6 text-green-600" />
               <span className="text-xs text-gray-600">Earnings</span>
             </button>
             <button
@@ -310,51 +437,38 @@ export default function DriverDashboard() {
             <div className="flex items-center justify-between py-2 border-b border-gray-100">
               <span className="text-gray-600">This Week</span>
               <span className="font-semibold text-gray-900">
-                ₱{driver.earnings.thisWeek.toLocaleString()}
+                ₱{earnings.thisWeek.toLocaleString()}
               </span>
             </div>
             <div className="flex items-center justify-between py-2 border-b border-gray-100">
               <span className="text-gray-600">This Month</span>
               <span className="font-semibold text-gray-900">
-                ₱{driver.earnings.thisMonth.toLocaleString()}
+                ₱{earnings.thisMonth.toLocaleString()}
               </span>
             </div>
             <div className="flex items-center justify-between py-2">
               <span className="text-gray-600">Pending Payout</span>
               <span className="font-semibold text-green-600">
-                ₱{driver.earnings.pendingPayout.toLocaleString()}
+                ₱{earnings.pendingPayout.toLocaleString()}
               </span>
             </div>
           </div>
         </Card>
 
-        {/* Performance */}
+        {/* Vehicle Info */}
         <Card>
-          <h3 className="font-semibold text-gray-900 mb-3">Your Performance</h3>
-          <div className="space-y-3">
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-sm text-gray-600">Acceptance Rate</span>
-                <span className="text-sm font-medium text-gray-900">{driver.acceptanceRate}%</span>
-              </div>
-              <div className="h-2 rounded-full bg-gray-100">
-                <div
-                  className="h-2 rounded-full bg-green-500"
-                  style={{ width: `${driver.acceptanceRate}%` }}
-                />
-              </div>
+          <h3 className="font-semibold text-gray-900 mb-3">Your Vehicle</h3>
+          <div className="flex items-center gap-4">
+            <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary-50">
+              <VehicleIcon type={driver.vehicleType as 'motorcycle' | 'car' | 'van'} size="md" />
             </div>
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-sm text-gray-600">Cancellation Rate</span>
-                <span className="text-sm font-medium text-gray-900">{driver.cancellationRate}%</span>
-              </div>
-              <div className="h-2 rounded-full bg-gray-100">
-                <div
-                  className="h-2 rounded-full bg-red-500"
-                  style={{ width: `${driver.cancellationRate}%` }}
-                />
-              </div>
+            <div className="flex-1">
+              <p className="font-medium text-gray-900">
+                {driver.vehicle?.color} {driver.vehicle?.make} {driver.vehicle?.model}
+              </p>
+              <p className="text-sm text-primary-600 font-semibold">
+                {driver.vehicle?.plateNumber}
+              </p>
             </div>
           </div>
         </Card>
@@ -366,7 +480,7 @@ export default function DriverDashboard() {
         onClose={handleDeclineRequest}
         title="New Ride Request"
       >
-        {pendingRequest && (
+        {pendingRide && (
           <div className="space-y-4">
             {/* Timer */}
             <div className="flex items-center justify-center">
@@ -403,15 +517,15 @@ export default function DriverDashboard() {
             <Card className="!bg-gray-50">
               <div className="flex items-center gap-2 mb-3">
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-100">
-                  {pendingRequest.type === 'ride' ? (
-                    <Car className="h-4 w-4 text-primary-600" />
-                  ) : (
-                    <Package className="h-4 w-4 text-primary-600" />
-                  )}
+                  <Car className="h-4 w-4 text-primary-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900 capitalize">{pendingRequest.type} Request</p>
-                  <p className="text-xs text-gray-500">{pendingRequest.customerName}</p>
+                  <p className="font-medium text-gray-900 capitalize">
+                    {pendingRide.vehicleType} Ride
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    Passenger request
+                  </p>
                 </div>
               </div>
 
@@ -420,22 +534,30 @@ export default function DriverDashboard() {
                   <div className="mt-1 h-2 w-2 rounded-full bg-green-500" />
                   <div>
                     <p className="text-xs text-gray-500">Pickup</p>
-                    <p className="text-sm font-medium text-gray-900">{pendingRequest.pickup}</p>
+                    <p className="text-sm font-medium text-gray-900">
+                      {pendingRide.pickup?.address || 'Unknown'}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-start gap-2">
                   <div className="mt-1 h-2 w-2 rounded-full bg-red-500" />
                   <div>
                     <p className="text-xs text-gray-500">Dropoff</p>
-                    <p className="text-sm font-medium text-gray-900">{pendingRequest.dropoff}</p>
+                    <p className="text-sm font-medium text-gray-900">
+                      {pendingRide.dropoff?.address || 'Unknown'}
+                    </p>
                   </div>
                 </div>
               </div>
 
               <div className="mt-3 flex items-center justify-between pt-3 border-t border-gray-200">
-                <span className="text-sm text-gray-500">{pendingRequest.distance}</span>
+                <span className="text-sm text-gray-500">
+                  {pendingRide.route?.distance
+                    ? `${(pendingRide.route.distance / 1000).toFixed(1)} km`
+                    : 'Calculating...'}
+                </span>
                 <span className="text-lg font-bold text-green-600">
-                  ₱{pendingRequest.estimatedEarnings}
+                  ₱{pendingRide.fare?.total?.toFixed(2) || '0.00'}
                 </span>
               </div>
             </Card>
@@ -453,9 +575,166 @@ export default function DriverDashboard() {
               <Button
                 fullWidth
                 onClick={handleAcceptRequest}
+                isLoading={isAccepting}
                 leftIcon={<CheckCircle2 className="h-5 w-5" />}
               >
                 Accept
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Notification Permission Modal */}
+      <Modal
+        isOpen={showNotificationPrompt}
+        onClose={() => setShowNotificationPrompt(false)}
+        title="Enable Notifications"
+      >
+        <div className="space-y-4">
+          <div className="flex justify-center">
+            <div className="h-16 w-16 rounded-full bg-primary-100 flex items-center justify-center">
+              <BellRing className="h-8 w-8 text-primary-600" />
+            </div>
+          </div>
+
+          <div className="text-center">
+            <p className="text-gray-600">
+              Enable notifications to get alerted when new ride requests come in, even when the app is in the background.
+            </p>
+          </div>
+
+          <div className="bg-yellow-50 rounded-lg p-3">
+            <p className="text-sm text-yellow-800">
+              <span className="font-medium">Important:</span> Without notifications, you may miss ride requests and lose potential earnings.
+            </p>
+          </div>
+
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              fullWidth
+              onClick={() => setShowNotificationPrompt(false)}
+            >
+              Not Now
+            </Button>
+            <Button
+              fullWidth
+              onClick={async () => {
+                const granted = await requestPermission()
+                if (granted) {
+                  await subscribePush()
+                }
+                setShowNotificationPrompt(false)
+              }}
+              leftIcon={<Bell className="h-5 w-5" />}
+            >
+              Enable
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Delivery Detail Modal */}
+      <Modal
+        isOpen={showDeliveryModal}
+        onClose={() => {
+          setShowDeliveryModal(false)
+          setSelectedDelivery(null)
+        }}
+        title="Delivery Details"
+      >
+        {selectedDelivery && (
+          <div className="space-y-4">
+            {/* Order Type */}
+            <div className="flex items-center justify-center">
+              <div className="h-16 w-16 rounded-full bg-orange-100 flex items-center justify-center">
+                <Package className="h-8 w-8 text-orange-600" />
+              </div>
+            </div>
+            <p className="text-center font-semibold text-gray-900">
+              {selectedDelivery.type === 'grocery' ? 'Grocery' : selectedDelivery.type === 'pharmacy' ? 'Pharmacy' : 'Food'} Delivery
+            </p>
+
+            {/* Order Info */}
+            <Card className="!bg-gray-50">
+              <p className="text-xs text-gray-500 mb-1">Order ID</p>
+              <p className="font-medium text-gray-900">#{selectedDelivery.id.slice(-8)}</p>
+
+              <div className="mt-3 pt-3 border-t border-gray-200">
+                <p className="text-xs text-gray-500 mb-1">Items</p>
+                <div className="space-y-1">
+                  {selectedDelivery.items?.slice(0, 3).map((item, idx) => (
+                    <p key={idx} className="text-sm text-gray-700">
+                      {item.quantity}x {item.name}
+                    </p>
+                  ))}
+                  {(selectedDelivery.items?.length || 0) > 3 && (
+                    <p className="text-xs text-gray-500">
+                      +{(selectedDelivery.items?.length || 0) - 3} more items
+                    </p>
+                  )}
+                </div>
+              </div>
+            </Card>
+
+            {/* Pickup Location */}
+            <div className="flex items-start gap-3">
+              <div className="mt-1 h-3 w-3 rounded-full bg-green-500" />
+              <div>
+                <p className="text-xs text-gray-500">Pickup from merchant</p>
+                <p className="text-sm font-medium text-gray-900">
+                  {selectedDelivery.merchantName || selectedDelivery.merchantId}
+                </p>
+              </div>
+            </div>
+
+            {/* Delivery Location */}
+            <div className="flex items-start gap-3">
+              <div className="mt-1 h-3 w-3 rounded-full bg-red-500" />
+              <div>
+                <p className="text-xs text-gray-500">Deliver to</p>
+                <p className="text-sm font-medium text-gray-900">
+                  {selectedDelivery.deliveryAddress?.address || 'Address not available'}
+                </p>
+                {selectedDelivery.deliveryAddress?.contactName && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    {selectedDelivery.deliveryAddress.contactName}
+                    {selectedDelivery.deliveryAddress.contactPhone && (
+                      <> • {selectedDelivery.deliveryAddress.contactPhone}</>
+                    )}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Earnings */}
+            <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+              <span className="text-gray-700">Delivery Fee</span>
+              <span className="text-xl font-bold text-green-600">
+                ₱{selectedDelivery.deliveryFee || 0}
+              </span>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                fullWidth
+                onClick={() => {
+                  setShowDeliveryModal(false)
+                  setSelectedDelivery(null)
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                fullWidth
+                onClick={handleAcceptDelivery}
+                isLoading={isAcceptingDelivery}
+                leftIcon={<CheckCircle2 className="h-5 w-5" />}
+              >
+                Accept Delivery
               </Button>
             </div>
           </div>

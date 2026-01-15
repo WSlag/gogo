@@ -4,6 +4,7 @@ export type VehicleType = 'motorcycle' | 'car' | 'van' | 'delivery' | 'happy_mov
 
 export type RideStatus =
   | 'pending'
+  | 'scheduled'
   | 'accepted'
   | 'arriving'
   | 'arrived'
@@ -64,6 +65,7 @@ export interface Ride {
   completedAt?: Timestamp
   cancelledAt?: Timestamp
   cancellationReason?: string
+  cancelledBy?: 'passenger' | 'driver' | 'system'
   rating?: number
   review?: string
   createdAt: Timestamp

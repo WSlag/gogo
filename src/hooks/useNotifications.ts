@@ -79,10 +79,10 @@ export function useNotifications(): UseNotificationsReturn {
 
       // Show browser notification
       if (Notification.permission === 'granted' && payload.notification) {
-        new Notification(payload.notification.title || 'GOGO', {
+        new Notification(payload.notification.title || 'GOGO Express', {
           body: payload.notification.body,
           icon: '/icons/icon-192x192.png',
-          badge: '/icons/badge-72x72.png',
+          badge: '/icons/icon-72x72.png',
           tag: payload.data?.type || 'default',
         })
       }

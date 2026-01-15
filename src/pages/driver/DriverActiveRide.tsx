@@ -12,88 +12,92 @@ import {
   CheckCircle2,
   AlertTriangle,
   Clock,
-  DollarSign,
+  AlertCircle,
+  ExternalLink,
 } from 'lucide-react'
-import { Button, Card, Modal } from '@/components/ui'
+import { PesoSign } from '@/components/icons'
+import { Button, Card, Modal, Spinner } from '@/components/ui'
+import { useDriver, useRealtimeLocation, NavigationUtils } from '@/hooks'
+import { MapView } from '@/components/maps'
 
-type RideStatus = 'going_pickup' | 'arrived_pickup' | 'in_progress' | 'arrived_destination' | 'completed'
+type DriverRideStatus = 'accepted' | 'arriving' | 'arrived' | 'in_progress' | 'completed'
 
-interface ActiveRide {
-  id: string
-  type: 'ride' | 'delivery'
-  status: RideStatus
-  pickup: {
-    address: string
-    lat: number
-    lng: number
-  }
-  dropoff: {
-    address: string
-    lat: number
-    lng: number
-  }
-  customer: {
-    name: string
-    phone: string
-    avatar?: string
-  }
-  fare: number
-  distance: string
-  estimatedTime: number
-  paymentMethod: 'cash' | 'wallet' | 'card'
-  notes?: string
-}
-
-const MOCK_RIDE: ActiveRide = {
-  id: 'ride_001',
-  type: 'ride',
-  status: 'going_pickup',
-  pickup: {
-    address: 'SM City Cotabato, Awang',
-    lat: 7.1917,
-    lng: 124.2246,
-  },
-  dropoff: {
-    address: 'Notre Dame University, Cotabato City',
-    lat: 7.2234,
-    lng: 124.2467,
-  },
-  customer: {
-    name: 'Maria Santos',
-    phone: '+639123456789',
-    avatar: 'https://randomuser.me/api/portraits/women/44.jpg',
-  },
-  fare: 85,
-  distance: '3.2 km',
-  estimatedTime: 12,
-  paymentMethod: 'cash',
-  notes: 'Please wait at the main entrance',
-}
-
-const STATUS_STEPS: { status: RideStatus; label: string; action: string }[] = [
-  { status: 'going_pickup', label: 'Going to Pickup', action: "I've Arrived" },
-  { status: 'arrived_pickup', label: 'Waiting for Passenger', action: 'Start Ride' },
-  { status: 'in_progress', label: 'Ride in Progress', action: "I've Arrived" },
-  { status: 'arrived_destination', label: 'At Destination', action: 'Complete Ride' },
+const STATUS_STEPS: { status: DriverRideStatus; label: string; action: string }[] = [
+  { status: 'accepted', label: 'Going to Pickup', action: 'Arriving at Pickup' },
+  { status: 'arriving', label: 'Almost There', action: "I've Arrived" },
+  { status: 'arrived', label: 'Waiting for Passenger', action: 'Start Ride' },
+  { status: 'in_progress', label: 'Ride in Progress', action: 'Complete Ride' },
   { status: 'completed', label: 'Completed', action: '' },
 ]
 
 export default function DriverActiveRide() {
   const navigate = useNavigate()
-  const [ride, setRide] = useState<ActiveRide>(MOCK_RIDE)
+  const {
+    driver,
+    activeRide,
+    isLoading,
+    updateRideStatus,
+    startRide,
+    completeRide,
+    cancelRide,
+    updateLocation,
+  } = useDriver()
+
   const [elapsedTime, setElapsedTime] = useState(0)
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [showCompleteModal, setShowCompleteModal] = useState(false)
+  const [showNavOptions, setShowNavOptions] = useState(false)
+  const [isUpdating, setIsUpdating] = useState(false)
+  const [cancelReason, setCancelReason] = useState('')
+
+  // Real-time location tracking
+  const { location: driverLocation, startTracking, stopTracking, isTracking } = useRealtimeLocation({
+    enableHighAccuracy: true,
+    updateInterval: 5000, // Update every 5 seconds
+    distanceFilter: 10, // Minimum 10 meters movement
+    onLocationUpdate: (loc) => {
+      // Update driver location in Firestore
+      if (activeRide && activeRide.status !== 'completed') {
+        updateLocation(loc.lat, loc.lng)
+      }
+    },
+  })
+
+  // Redirect if no active ride (with a small delay to allow state to sync)
+  useEffect(() => {
+    if (!isLoading && !activeRide) {
+      // Small delay to prevent race condition during state updates
+      const timeout = setTimeout(() => {
+        navigate('/driver')
+      }, 500)
+      return () => clearTimeout(timeout)
+    }
+  }, [isLoading, activeRide, navigate])
 
   // Timer for ride duration
   useEffect(() => {
-    if (ride.status === 'in_progress') {
+    if (activeRide?.status === 'in_progress') {
       const interval = setInterval(() => {
         setElapsedTime((prev) => prev + 1)
       }, 1000)
       return () => clearInterval(interval)
     }
-  }, [ride.status])
+  }, [activeRide?.status])
+
+  // Start/stop location tracking based on active ride
+  useEffect(() => {
+    if (activeRide && activeRide.status !== 'completed' && !isTracking) {
+      startTracking()
+    } else if ((!activeRide || activeRide.status === 'completed') && isTracking) {
+      stopTracking()
+    }
+
+    return () => {
+      if (isTracking) {
+        stopTracking()
+      }
+    }
+  }, [activeRide?.id, activeRide?.status, isTracking, startTracking, stopTracking])
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
@@ -102,42 +106,164 @@ export default function DriverActiveRide() {
   }
 
   const getCurrentStatusIndex = () => {
-    return STATUS_STEPS.findIndex((s) => s.status === ride.status)
+    if (!activeRide) return 0
+    return STATUS_STEPS.findIndex((s) => s.status === activeRide.status)
   }
 
-  const handleStatusAdvance = () => {
-    const currentIndex = getCurrentStatusIndex()
-    if (currentIndex < STATUS_STEPS.length - 2) {
-      const nextStatus = STATUS_STEPS[currentIndex + 1].status
-      setRide((prev) => ({ ...prev, status: nextStatus }))
-    } else if (ride.status === 'arrived_destination') {
-      setShowCompleteModal(true)
+  const handleStatusAdvance = async () => {
+    if (!activeRide) {
+      console.error('handleStatusAdvance: No active ride')
+      return
+    }
+
+    console.log('handleStatusAdvance called, current status:', activeRide.status)
+    setIsUpdating(true)
+    try {
+      const currentStatus = activeRide.status
+
+      if (currentStatus === 'accepted') {
+        // Move to arriving - driver is on their way to pickup
+        console.log('Updating to arriving...')
+        const result = await updateRideStatus(activeRide.id, 'arriving')
+        console.log('Update result:', result)
+      } else if (currentStatus === 'arriving') {
+        // Move to arrived - driver has arrived at pickup location
+        console.log('Updating to arrived...')
+        const result = await updateRideStatus(activeRide.id, 'arrived')
+        console.log('Update result:', result)
+      } else if (currentStatus === 'arrived') {
+        // Start the ride - passenger is in the vehicle
+        console.log('Starting ride...')
+        const result = await startRide(activeRide.id)
+        console.log('Start ride result:', result)
+      } else if (currentStatus === 'in_progress') {
+        // Show complete modal
+        console.log('Showing complete modal')
+        setShowCompleteModal(true)
+      }
+    } catch (err) {
+      console.error('handleStatusAdvance error:', err)
+    } finally {
+      setIsUpdating(false)
     }
   }
 
-  const handleCompleteRide = () => {
-    setShowCompleteModal(false)
-    setRide((prev) => ({ ...prev, status: 'completed' }))
+  const handleCompleteRide = async () => {
+    if (!activeRide) return
+
+    setIsUpdating(true)
+    try {
+      const success = await completeRide(activeRide.id)
+      if (success) {
+        setShowCompleteModal(false)
+      }
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
+  const handleCancelRide = async () => {
+    if (!activeRide) return
+
+    setIsUpdating(true)
+    try {
+      const success = await cancelRide(activeRide.id, cancelReason || 'Driver cancelled')
+      if (success) {
+        setShowCancelModal(false)
+        navigate('/driver')
+      }
+    } finally {
+      setIsUpdating(false)
+    }
   }
 
   const handleCall = () => {
-    window.location.href = `tel:${ride.customer.phone}`
+    // In production, fetch passenger phone from users collection
+    window.location.href = `tel:+639000000000`
   }
 
   const handleMessage = () => {
-    window.location.href = `sms:${ride.customer.phone}`
+    window.location.href = `sms:+639000000000`
   }
 
   const handleNavigate = () => {
-    const destination = ride.status === 'going_pickup' || ride.status === 'arrived_pickup'
-      ? ride.pickup
-      : ride.dropoff
-    window.open(`https://www.google.com/maps/dir/?api=1&destination=${destination.lat},${destination.lng}`, '_blank')
+    setShowNavOptions(true)
   }
 
-  const currentStep = STATUS_STEPS[getCurrentStatusIndex()]
+  const getNavigationDestination = () => {
+    if (!activeRide) return null
 
-  if (ride.status === 'completed') {
+    const isGoingToPickup = activeRide.status === 'accepted' || activeRide.status === 'arriving' || activeRide.status === 'arrived'
+    const destination = isGoingToPickup ? activeRide.pickup?.coordinates : activeRide.dropoff?.coordinates
+
+    if (!destination) return null
+
+    return {
+      lat: destination.latitude,
+      lng: destination.longitude,
+      label: isGoingToPickup ? 'Pickup Location' : 'Drop-off Location',
+    }
+  }
+
+  const handleOpenGoogleMaps = () => {
+    const dest = getNavigationDestination()
+    if (!dest) return
+    NavigationUtils.openDirectionsInGoogleMaps(
+      driverLocation?.lat || 0,
+      driverLocation?.lng || 0,
+      dest.lat,
+      dest.lng
+    )
+    setShowNavOptions(false)
+  }
+
+  const handleOpenWaze = () => {
+    const dest = getNavigationDestination()
+    if (!dest) return
+    NavigationUtils.openDirectionsInWaze(dest.lat, dest.lng)
+    setShowNavOptions(false)
+  }
+
+  const handleOpenNativeNav = () => {
+    const dest = getNavigationDestination()
+    if (!dest) return
+    NavigationUtils.openNativeNavigation(dest.lat, dest.lng, dest.label)
+    setShowNavOptions(false)
+  }
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Spinner size="lg" />
+      </div>
+    )
+  }
+
+  // No active ride
+  if (!activeRide) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-4">
+        <Card className="text-center py-8">
+          <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            No Active Ride
+          </h2>
+          <p className="text-gray-600 mb-4">
+            You don't have an active ride at the moment.
+          </p>
+          <Button onClick={() => navigate('/driver')}>
+            Back to Dashboard
+          </Button>
+        </Card>
+      </div>
+    )
+  }
+
+  const currentStep = STATUS_STEPS[getCurrentStatusIndex()] || STATUS_STEPS[0]
+
+  // Completed state
+  if (activeRide.status === 'completed') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <Card className="text-center max-w-md w-full">
@@ -152,16 +278,20 @@ export default function DriverActiveRide() {
           <div className="bg-gray-50 rounded-xl p-4 mb-6">
             <div className="flex items-center justify-between mb-2">
               <span className="text-gray-600">Fare</span>
-              <span className="font-bold text-xl text-green-600">₱{ride.fare}</span>
+              <span className="font-bold text-xl text-green-600">
+                ₱{activeRide.fare?.total?.toFixed(2) || '0.00'}
+              </span>
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-gray-500">Payment Method</span>
-              <span className="capitalize text-gray-700">{ride.paymentMethod}</span>
+              <span className="capitalize text-gray-700">{activeRide.paymentMethod}</span>
             </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-500">Trip Duration</span>
-              <span className="text-gray-700">{formatTime(elapsedTime)}</span>
-            </div>
+            {elapsedTime > 0 && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-500">Trip Duration</span>
+                <span className="text-gray-700">{formatTime(elapsedTime)}</span>
+              </div>
+            )}
           </div>
 
           <Button fullWidth onClick={() => navigate('/driver')}>
@@ -172,13 +302,42 @@ export default function DriverActiveRide() {
     )
   }
 
+  // Build map markers
+  const mapMarkers = []
+  if (activeRide.pickup?.coordinates) {
+    mapMarkers.push({
+      position: {
+        lat: activeRide.pickup.coordinates.latitude,
+        lng: activeRide.pickup.coordinates.longitude,
+      },
+      type: 'pickup' as const,
+      label: 'Pickup',
+    })
+  }
+  if (activeRide.dropoff?.coordinates) {
+    mapMarkers.push({
+      position: {
+        lat: activeRide.dropoff.coordinates.latitude,
+        lng: activeRide.dropoff.coordinates.longitude,
+      },
+      type: 'dropoff' as const,
+      label: 'Dropoff',
+    })
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 pb-32">
-      {/* Map Placeholder */}
-      <div className="h-64 bg-gradient-to-b from-primary-100 to-primary-50 relative">
+      {/* Map */}
+      <div className="h-64 relative">
+        <MapView
+          markers={mapMarkers}
+          className="h-full w-full"
+          zoom={14}
+        />
+
         <button
           onClick={() => setShowCancelModal(true)}
-          className="absolute top-4 left-4 bg-white rounded-full p-2 shadow-md"
+          className="absolute top-4 left-4 bg-white rounded-full p-2 shadow-md z-10"
         >
           <ArrowLeft className="h-5 w-5 text-gray-600" />
         </button>
@@ -186,30 +345,30 @@ export default function DriverActiveRide() {
         {/* Navigate Button */}
         <button
           onClick={handleNavigate}
-          className="absolute top-4 right-4 bg-primary-600 text-white rounded-xl px-4 py-2 shadow-md flex items-center gap-2"
+          className="absolute top-4 right-4 bg-primary-600 text-white rounded-xl px-4 py-2 shadow-md flex items-center gap-2 z-10"
         >
           <Navigation className="h-5 w-5" />
           Navigate
         </button>
 
         {/* Status Badge */}
-        <div className="absolute bottom-4 left-4 right-4">
+        <div className="absolute bottom-4 left-4 right-4 z-10">
           <div className="bg-white rounded-xl shadow-lg p-3 flex items-center gap-3">
             <div className={`h-3 w-3 rounded-full ${
-              ride.status === 'in_progress' ? 'bg-green-500 animate-pulse' : 'bg-primary-500'
+              activeRide.status === 'in_progress' ? 'bg-green-500 animate-pulse' : 'bg-primary-500'
             }`} />
             <div className="flex-1">
               <p className="font-medium text-gray-900">{currentStep.label}</p>
-              {ride.status === 'in_progress' && (
+              {activeRide.status === 'in_progress' && (
                 <p className="text-sm text-gray-500">Duration: {formatTime(elapsedTime)}</p>
               )}
             </div>
-            {ride.status !== 'completed' && (
-              <div className="text-right">
-                <p className="text-xs text-gray-500">Est. Time</p>
-                <p className="font-medium text-gray-900">{ride.estimatedTime} min</p>
-              </div>
-            )}
+            <div className="text-right">
+              <p className="text-xs text-gray-500">Fare</p>
+              <p className="font-medium text-green-600">
+                ₱{activeRide.fare?.total?.toFixed(2) || '0.00'}
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -218,26 +377,14 @@ export default function DriverActiveRide() {
         {/* Customer Info */}
         <Card>
           <div className="flex items-center gap-3">
-            {ride.customer.avatar ? (
-              <img
-                src={ride.customer.avatar}
-                alt={ride.customer.name}
-                className="h-12 w-12 rounded-full object-cover"
-              />
-            ) : (
-              <div className="h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center">
-                <User className="h-6 w-6 text-gray-400" />
-              </div>
-            )}
+            <div className="h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center">
+              <User className="h-6 w-6 text-gray-400" />
+            </div>
             <div className="flex-1">
-              <p className="font-semibold text-gray-900">{ride.customer.name}</p>
+              <p className="font-semibold text-gray-900">Passenger</p>
               <div className="flex items-center gap-1 text-sm text-gray-500">
-                {ride.type === 'ride' ? (
-                  <Car className="h-4 w-4" />
-                ) : (
-                  <Package className="h-4 w-4" />
-                )}
-                <span className="capitalize">{ride.type}</span>
+                <Car className="h-4 w-4" />
+                <span className="capitalize">{activeRide.vehicleType}</span>
               </div>
             </div>
             <div className="flex gap-2">
@@ -255,14 +402,6 @@ export default function DriverActiveRide() {
               </button>
             </div>
           </div>
-
-          {ride.notes && (
-            <div className="mt-3 p-3 bg-yellow-50 rounded-lg">
-              <p className="text-sm text-yellow-800">
-                <span className="font-medium">Note:</span> {ride.notes}
-              </p>
-            </div>
-          )}
         </Card>
 
         {/* Route Details */}
@@ -272,9 +411,9 @@ export default function DriverActiveRide() {
               <div className="mt-1 h-3 w-3 rounded-full bg-green-500" />
               <div className="flex-1">
                 <p className="text-xs text-gray-500">Pickup</p>
-                <p className="font-medium text-gray-900">{ride.pickup.address}</p>
+                <p className="font-medium text-gray-900">{activeRide.pickup?.address || 'Unknown'}</p>
               </div>
-              {(ride.status === 'going_pickup' || ride.status === 'arrived_pickup') && (
+              {(activeRide.status === 'accepted' || activeRide.status === 'arriving' || activeRide.status === 'arrived') && (
                 <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">Current</span>
               )}
             </div>
@@ -285,10 +424,10 @@ export default function DriverActiveRide() {
               <div className="mt-1 h-3 w-3 rounded-full bg-red-500" />
               <div className="flex-1">
                 <p className="text-xs text-gray-500">Dropoff</p>
-                <p className="font-medium text-gray-900">{ride.dropoff.address}</p>
+                <p className="font-medium text-gray-900">{activeRide.dropoff?.address || 'Unknown'}</p>
               </div>
-              {(ride.status === 'in_progress' || ride.status === 'arrived_destination') && (
-                <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded">Destination</span>
+              {activeRide.status === 'in_progress' && (
+                <span className="text-xs bg-error-light text-error px-2 py-1 rounded">Destination</span>
               )}
             </div>
           </div>
@@ -301,22 +440,32 @@ export default function DriverActiveRide() {
               <div className="flex items-center justify-center gap-1 text-gray-500 mb-1">
                 <MapPin className="h-4 w-4" />
               </div>
-              <p className="font-semibold text-gray-900">{ride.distance}</p>
+              <p className="font-semibold text-gray-900">
+                {activeRide.route?.distance
+                  ? `${(activeRide.route.distance / 1000).toFixed(1)} km`
+                  : 'N/A'}
+              </p>
               <p className="text-xs text-gray-500">Distance</p>
             </div>
             <div>
               <div className="flex items-center justify-center gap-1 text-gray-500 mb-1">
                 <Clock className="h-4 w-4" />
               </div>
-              <p className="font-semibold text-gray-900">{ride.estimatedTime} min</p>
+              <p className="font-semibold text-gray-900">
+                {activeRide.route?.duration
+                  ? `${Math.round(activeRide.route.duration / 60)} min`
+                  : 'N/A'}
+              </p>
               <p className="text-xs text-gray-500">Est. Time</p>
             </div>
             <div>
               <div className="flex items-center justify-center gap-1 text-gray-500 mb-1">
-                <DollarSign className="h-4 w-4" />
+                <PesoSign className="h-4 w-4" />
               </div>
-              <p className="font-semibold text-green-600">₱{ride.fare}</p>
-              <p className="text-xs text-gray-500">{ride.paymentMethod}</p>
+              <p className="font-semibold text-green-600">
+                ₱{activeRide.fare?.total?.toFixed(2) || '0.00'}
+              </p>
+              <p className="text-xs text-gray-500 capitalize">{activeRide.paymentMethod}</p>
             </div>
           </div>
         </Card>
@@ -358,8 +507,13 @@ export default function DriverActiveRide() {
       </div>
 
       {/* Bottom Action */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 safe-area-inset-bottom">
-        <Button fullWidth size="lg" onClick={handleStatusAdvance}>
+      <div className="fixed bottom-16 left-0 right-0 lg:bottom-0 lg:left-[240px] bg-white border-t p-4 z-50">
+        <Button
+          fullWidth
+          size="lg"
+          onClick={handleStatusAdvance}
+          isLoading={isUpdating}
+        >
           {currentStep.action}
         </Button>
       </div>
@@ -381,6 +535,24 @@ export default function DriverActiveRide() {
             </div>
           </div>
 
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Reason for cancellation
+            </label>
+            <select
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              className="w-full rounded-lg border border-gray-200 px-3 py-2"
+            >
+              <option value="">Select a reason</option>
+              <option value="passenger_not_found">Passenger not found</option>
+              <option value="passenger_requested">Passenger requested</option>
+              <option value="vehicle_issue">Vehicle issue</option>
+              <option value="emergency">Emergency</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+
           <div className="flex gap-3">
             <Button
               variant="outline"
@@ -392,7 +564,8 @@ export default function DriverActiveRide() {
             <Button
               variant="danger"
               fullWidth
-              onClick={() => navigate('/driver')}
+              onClick={handleCancelRide}
+              isLoading={isUpdating}
             >
               Cancel Ride
             </Button>
@@ -408,22 +581,101 @@ export default function DriverActiveRide() {
       >
         <div className="space-y-4">
           <div className="text-center py-4">
-            <p className="text-3xl font-bold text-green-600 mb-2">₱{ride.fare}</p>
+            <p className="text-3xl font-bold text-green-600 mb-2">
+              ₱{activeRide.fare?.total?.toFixed(2) || '0.00'}
+            </p>
             <p className="text-gray-600">
-              Payment: <span className="capitalize font-medium">{ride.paymentMethod}</span>
+              Payment: <span className="capitalize font-medium">{activeRide.paymentMethod}</span>
             </p>
           </div>
 
-          {ride.paymentMethod === 'cash' && (
+          {activeRide.paymentMethod === 'cash' && (
             <div className="p-3 bg-yellow-50 rounded-lg">
               <p className="text-sm text-yellow-800">
-                <span className="font-medium">Cash Payment:</span> Please collect ₱{ride.fare} from the passenger.
+                <span className="font-medium">Cash Payment:</span> Please collect ₱{activeRide.fare?.total?.toFixed(2)} from the passenger.
               </p>
             </div>
           )}
 
-          <Button fullWidth onClick={handleCompleteRide}>
+          <Button
+            fullWidth
+            onClick={handleCompleteRide}
+            isLoading={isUpdating}
+          >
             Confirm & Complete
+          </Button>
+        </div>
+      </Modal>
+
+      {/* Navigation Options Modal */}
+      <Modal
+        isOpen={showNavOptions}
+        onClose={() => setShowNavOptions(false)}
+        title="Open Navigation"
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-gray-600 mb-4">
+            Navigate to: <span className="font-medium">{getNavigationDestination()?.label}</span>
+          </p>
+
+          <button
+            onClick={handleOpenGoogleMaps}
+            className="w-full flex items-center gap-4 p-4 rounded-xl border border-gray-200 hover:bg-gray-50 transition"
+          >
+            <div className="h-12 w-12 rounded-xl bg-blue-100 flex items-center justify-center">
+              <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none">
+                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#4285F4"/>
+                <circle cx="12" cy="9" r="2.5" fill="#fff"/>
+              </svg>
+            </div>
+            <div className="flex-1 text-left">
+              <p className="font-semibold text-gray-900">Google Maps</p>
+              <p className="text-sm text-gray-500">Open directions in Google Maps</p>
+            </div>
+            <ExternalLink className="h-5 w-5 text-gray-400" />
+          </button>
+
+          <button
+            onClick={handleOpenWaze}
+            className="w-full flex items-center gap-4 p-4 rounded-xl border border-gray-200 hover:bg-gray-50 transition"
+          >
+            <div className="h-12 w-12 rounded-xl bg-sky-100 flex items-center justify-center">
+              <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none">
+                <circle cx="12" cy="12" r="10" fill="#33CCFF"/>
+                <circle cx="9" cy="10" r="1.5" fill="#000"/>
+                <circle cx="15" cy="10" r="1.5" fill="#000"/>
+                <path d="M8 14c0 0 2 3 4 3s4-3 4-3" stroke="#000" strokeWidth="1.5" fill="none"/>
+              </svg>
+            </div>
+            <div className="flex-1 text-left">
+              <p className="font-semibold text-gray-900">Waze</p>
+              <p className="text-sm text-gray-500">Open directions in Waze</p>
+            </div>
+            <ExternalLink className="h-5 w-5 text-gray-400" />
+          </button>
+
+          {NavigationUtils.isMobile() && (
+            <button
+              onClick={handleOpenNativeNav}
+              className="w-full flex items-center gap-4 p-4 rounded-xl border border-gray-200 hover:bg-gray-50 transition"
+            >
+              <div className="h-12 w-12 rounded-xl bg-gray-100 flex items-center justify-center">
+                <Navigation className="h-7 w-7 text-gray-600" />
+              </div>
+              <div className="flex-1 text-left">
+                <p className="font-semibold text-gray-900">Default Navigation</p>
+                <p className="text-sm text-gray-500">Open in device's default app</p>
+              </div>
+              <ExternalLink className="h-5 w-5 text-gray-400" />
+            </button>
+          )}
+
+          <Button
+            variant="outline"
+            fullWidth
+            onClick={() => setShowNavOptions(false)}
+          >
+            Cancel
           </Button>
         </div>
       </Modal>

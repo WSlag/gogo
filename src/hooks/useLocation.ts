@@ -55,9 +55,16 @@ export function useLocation(): UseLocationReturn {
 
   // Initialize Google Maps services when available
   useEffect(() => {
+    let mapDiv: HTMLDivElement | null = null
+    let intervalId: ReturnType<typeof setInterval> | null = null
+
     const initServices = () => {
       if (window.google?.maps?.places) {
-        const mapDiv = document.createElement('div')
+        // Create a hidden div for the map (required by PlacesService)
+        mapDiv = document.createElement('div')
+        mapDiv.style.display = 'none'
+        document.body.appendChild(mapDiv)
+
         const map = new google.maps.Map(mapDiv)
         setPlacesService(new google.maps.places.PlacesService(map))
         setAutocompleteService(new google.maps.places.AutocompleteService())
@@ -71,14 +78,25 @@ export function useLocation(): UseLocationReturn {
       initServices()
     } else {
       // Wait for Google Maps to load
-      const interval = setInterval(() => {
+      intervalId = setInterval(() => {
         if (window.google?.maps) {
           initServices()
-          clearInterval(interval)
+          if (intervalId) {
+            clearInterval(intervalId)
+            intervalId = null
+          }
         }
       }, 100)
+    }
 
-      return () => clearInterval(interval)
+    // Cleanup: remove hidden div and clear interval
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId)
+      }
+      if (mapDiv && mapDiv.parentNode) {
+        mapDiv.parentNode.removeChild(mapDiv)
+      }
     }
   }, [])
 

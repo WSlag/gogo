@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   ChevronLeft,
@@ -14,7 +14,7 @@ import {
 import { useRideStore } from '@/store'
 import { cn } from '@/utils/cn'
 import { GeoPoint } from 'firebase/firestore'
-import { MapView } from '@/components/rides/MapView'
+import { MapView } from '@/components/maps/MapView'
 import { CenterPin } from '@/components/rides/LocationPin'
 
 interface SavedLocation {
@@ -101,9 +101,26 @@ export default function LocationPicker() {
 
   const [activeTab, setActiveTab] = useState<'map' | 'recent' | 'favorites'>('map')
   const [searchQuery, setSearchQuery] = useState('')
+  const [pickupQuery, setPickupQuery] = useState(pickup?.address || '')
+  const [dropoffQuery, setDropoffQuery] = useState(dropoff?.address || '')
   const [favorites, setFavorites] = useState<Set<string>>(
     new Set(recentLocations.filter((l) => l.isFavorite).map((l) => l.id))
   )
+  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>({ lat: 7.2236, lng: 124.2464 })
+  const [isReverseGeocoding, setIsReverseGeocoding] = useState(false)
+
+  // Sync query states with store values
+  useEffect(() => {
+    if (pickup?.address && !pickupQuery) {
+      setPickupQuery(pickup.address)
+    }
+  }, [pickup?.address])
+
+  useEffect(() => {
+    if (dropoff?.address && !dropoffQuery) {
+      setDropoffQuery(dropoff.address)
+    }
+  }, [dropoff?.address])
 
   const handleSelectLocation = (location: SavedLocation) => {
     const locationInfo = {
@@ -114,8 +131,10 @@ export default function LocationPicker() {
 
     if (locationType === 'pickup') {
       setPickup(locationInfo)
+      setPickupQuery(location.address)
     } else if (locationType === 'dropoff') {
       setDropoff(locationInfo)
+      setDropoffQuery(location.address)
     }
 
     navigate(-1)
@@ -146,21 +165,113 @@ export default function LocationPicker() {
     navigate(-1)
   }
 
-  const handleConfirmMapLocation = () => {
-    // Mock location from map center (would use reverse geocoding) - Cotabato City
-    const mapLocation = {
-      address: 'Selected Location on Map',
-      coordinates: new GeoPoint(7.2236, 124.2464),
-      details: 'Map Selection'
+  // Reverse geocode to get address from coordinates
+  const reverseGeocode = useCallback(async (lat: number, lng: number): Promise<string> => {
+    if (typeof google === 'undefined' || !google.maps) {
+      return `${lat.toFixed(6)}, ${lng.toFixed(6)}`
     }
 
-    if (locationType === 'pickup') {
-      setPickup(mapLocation)
-    } else if (locationType === 'dropoff') {
-      setDropoff(mapLocation)
+    try {
+      const geocoder = new google.maps.Geocoder()
+      const response = await geocoder.geocode({ location: { lat, lng } })
+
+      if (response.results && response.results.length > 0) {
+        // Return the most detailed address (first result)
+        return response.results[0].formatted_address
+      }
+      return `${lat.toFixed(6)}, ${lng.toFixed(6)}`
+    } catch (error) {
+      console.error('Reverse geocoding failed:', error)
+      return `${lat.toFixed(6)}, ${lng.toFixed(6)}`
+    }
+  }, [])
+
+  // Forward geocode to get coordinates from address
+  const forwardGeocode = useCallback(async (address: string): Promise<{ lat: number; lng: number } | null> => {
+    if (typeof google === 'undefined' || !google.maps) {
+      return null
     }
 
-    navigate(-1)
+    try {
+      const geocoder = new google.maps.Geocoder()
+      // Bias results toward Cotabato City area
+      const response = await geocoder.geocode({
+        address: address,
+        region: 'PH',
+        bounds: new google.maps.LatLngBounds(
+          { lat: 7.1, lng: 124.1 }, // SW corner
+          { lat: 7.4, lng: 124.4 }  // NE corner
+        )
+      })
+
+      if (response.results && response.results.length > 0) {
+        const location = response.results[0].geometry.location
+        return { lat: location.lat(), lng: location.lng() }
+      }
+      return null
+    } catch (error) {
+      console.error('Forward geocoding failed:', error)
+      return null
+    }
+  }, [])
+
+  // Handle map center change
+  const handleMapCenterChanged = useCallback((center: { lat: number; lng: number }) => {
+    setMapCenter(center)
+  }, [])
+
+  // Handle using typed address with geocoding
+  const handleUseTypedAddress = useCallback(async (address: string) => {
+    setIsReverseGeocoding(true)
+
+    try {
+      // Try to geocode the typed address
+      const coords = await forwardGeocode(address)
+
+      const locationInfo = {
+        address: address,
+        // Use geocoded coordinates if available, otherwise use current map center
+        coordinates: coords
+          ? new GeoPoint(coords.lat, coords.lng)
+          : new GeoPoint(mapCenter.lat, mapCenter.lng),
+        details: address
+      }
+
+      if (locationType === 'pickup') {
+        setPickup(locationInfo)
+      } else if (locationType === 'dropoff') {
+        setDropoff(locationInfo)
+      }
+
+      navigate(-1)
+    } finally {
+      setIsReverseGeocoding(false)
+    }
+  }, [forwardGeocode, locationType, mapCenter, navigate, setPickup, setDropoff])
+
+  const handleConfirmMapLocation = async () => {
+    setIsReverseGeocoding(true)
+
+    try {
+      // Get address from map center coordinates using reverse geocoding
+      const address = await reverseGeocode(mapCenter.lat, mapCenter.lng)
+
+      const mapLocation = {
+        address: address,
+        coordinates: new GeoPoint(mapCenter.lat, mapCenter.lng),
+        details: 'Map Selection'
+      }
+
+      if (locationType === 'pickup') {
+        setPickup(mapLocation)
+      } else if (locationType === 'dropoff') {
+        setDropoff(mapLocation)
+      }
+
+      navigate(-1)
+    } finally {
+      setIsReverseGeocoding(false)
+    }
   }
 
   const toggleFavorite = (e: React.MouseEvent, locationId: string) => {
@@ -176,13 +287,21 @@ export default function LocationPicker() {
     })
   }
 
+  // Use the active query (pickup or dropoff) for filtering
+  const activeQuery = locationType === 'pickup' ? pickupQuery : dropoffQuery
+
   const filteredLocations =
     activeTab === 'favorites'
-      ? favoriteLocations
+      ? favoriteLocations.filter((l) =>
+          activeQuery
+            ? l.label.toLowerCase().includes(activeQuery.toLowerCase()) ||
+              l.address.toLowerCase().includes(activeQuery.toLowerCase())
+            : true
+        )
       : recentLocations.filter((l) =>
-          searchQuery
-            ? l.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
-              l.address.toLowerCase().includes(searchQuery.toLowerCase())
+          activeQuery || searchQuery
+            ? l.label.toLowerCase().includes((activeQuery || searchQuery).toLowerCase()) ||
+              l.address.toLowerCase().includes((activeQuery || searchQuery).toLowerCase())
             : true
         )
 
@@ -217,16 +336,16 @@ export default function LocationPicker() {
 
       {/* Location Inputs */}
       <div className="bg-white border-b border-gray-100 px-4 py-4 lg:px-8">
-        <div className="max-w-3xl mx-auto">
+        <div className="max-w-3xl mx-auto relative">
           <div className="flex items-center gap-3">
             <div className="flex-1 space-y-2">
               {/* Pickup Input */}
-              <button
+              <div
                 onClick={() =>
                   navigate('/rides/location?type=pickup', { replace: true })
                 }
                 className={cn(
-                  'flex w-full items-center gap-3 rounded-lg border px-4 py-3 text-left transition-all',
+                  'flex w-full items-center gap-3 rounded-lg border px-4 py-3 text-left transition-all cursor-pointer',
                   locationType === 'pickup'
                     ? 'border-primary-500 bg-primary-50'
                     : 'border-gray-200 hover:bg-gray-50'
@@ -242,24 +361,36 @@ export default function LocationPicker() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs text-gray-500">Pickup</p>
-                  <p
-                    className={cn(
-                      'text-sm font-medium truncate',
-                      pickup ? 'text-gray-900' : 'text-gray-400'
-                    )}
-                  >
-                    {pickup?.address || 'Set pickup location'}
-                  </p>
+                  {locationType === 'pickup' ? (
+                    <input
+                      type="text"
+                      value={pickupQuery}
+                      onChange={(e) => setPickupQuery(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      placeholder="Set pickup location"
+                      autoFocus
+                      className="w-full text-sm font-medium text-gray-900 placeholder-gray-400 bg-transparent outline-none"
+                    />
+                  ) : (
+                    <p
+                      className={cn(
+                        'text-sm font-medium truncate',
+                        pickup ? 'text-gray-900' : 'text-gray-400'
+                      )}
+                    >
+                      {pickup?.address || 'Set pickup location'}
+                    </p>
+                  )}
                 </div>
-              </button>
+              </div>
 
               {/* Dropoff Input */}
-              <button
+              <div
                 onClick={() =>
                   navigate('/rides/location?type=dropoff', { replace: true })
                 }
                 className={cn(
-                  'flex w-full items-center gap-3 rounded-lg border px-4 py-3 text-left transition-all',
+                  'flex w-full items-center gap-3 rounded-lg border px-4 py-3 text-left transition-all cursor-pointer',
                   locationType === 'dropoff'
                     ? 'border-primary-500 bg-primary-50'
                     : 'border-gray-200 hover:bg-gray-50'
@@ -277,16 +408,28 @@ export default function LocationPicker() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs text-gray-500">Drop-off</p>
-                  <p
-                    className={cn(
-                      'text-sm font-medium truncate',
-                      dropoff ? 'text-gray-900' : 'text-gray-400'
-                    )}
-                  >
-                    {dropoff?.address || 'Where to?'}
-                  </p>
+                  {locationType === 'dropoff' ? (
+                    <input
+                      type="text"
+                      value={dropoffQuery}
+                      onChange={(e) => setDropoffQuery(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      placeholder="Where to?"
+                      autoFocus
+                      className="w-full text-sm font-medium text-gray-900 placeholder-gray-400 bg-transparent outline-none"
+                    />
+                  ) : (
+                    <p
+                      className={cn(
+                        'text-sm font-medium truncate',
+                        dropoff ? 'text-gray-900' : 'text-gray-400'
+                      )}
+                    >
+                      {dropoff?.address || 'Where to?'}
+                    </p>
+                  )}
                 </div>
-              </button>
+              </div>
             </div>
 
             {/* Swap Button */}
@@ -303,6 +446,50 @@ export default function LocationPicker() {
               <ArrowUpDown className="h-5 w-5" />
             </button>
           </div>
+
+          {/* Search Results Dropdown */}
+          {activeQuery && activeQuery.length > 0 && (
+            <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 max-h-64 overflow-y-auto">
+              {/* Use typed address option */}
+              <button
+                onClick={() => handleUseTypedAddress(activeQuery)}
+                disabled={isReverseGeocoding}
+                className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 border-b border-gray-100 disabled:opacity-50"
+              >
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-100">
+                  <Search className="h-4 w-4 text-primary-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-primary-600">
+                    {isReverseGeocoding ? 'Searching...' : `Search "${activeQuery}"`}
+                  </p>
+                </div>
+              </button>
+
+              {/* Filtered locations */}
+              {filteredLocations.slice(0, 5).map((location) => (
+                <button
+                  key={location.id}
+                  onClick={() => handleSelectLocation(location)}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-gray-50"
+                >
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100">
+                    {getLocationIcon(location)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900">{location.label}</p>
+                    <p className="text-xs text-gray-500 truncate">{location.address}</p>
+                  </div>
+                </button>
+              ))}
+
+              {filteredLocations.length === 0 && (
+                <div className="px-4 py-3 text-sm text-gray-500">
+                  No matching locations found
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -332,11 +519,17 @@ export default function LocationPicker() {
           /* Map View */
           <div className="flex-1 flex flex-col">
             {/* Map Container */}
-            <div className="relative flex-1 min-h-[300px]">
+            <div className="relative flex-1 min-h-[400px] h-[50vh]">
               <MapView
-                pickup={pickup}
-                dropoff={dropoff}
+                center={
+                  pickup?.coordinates
+                    ? { lat: pickup.coordinates.latitude, lng: pickup.coordinates.longitude }
+                    : { lat: 7.2236, lng: 124.2464 }
+                }
                 className="h-full w-full"
+                showCurrentLocation
+                interactive
+                onCenterChanged={handleMapCenterChanged}
               />
 
               {/* Center Pin */}
@@ -356,9 +549,10 @@ export default function LocationPicker() {
             <div className="p-4 bg-white border-t border-gray-100">
               <button
                 onClick={handleConfirmMapLocation}
-                className="w-full h-12 rounded-xl bg-primary-600 text-white font-semibold hover:bg-primary-700 active:scale-[0.98] transition-all"
+                disabled={isReverseGeocoding}
+                className="w-full h-12 rounded-xl bg-primary-600 text-white font-semibold hover:bg-primary-700 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Confirm Location
+                {isReverseGeocoding ? 'Getting Address...' : 'Confirm Location'}
               </button>
             </div>
           </div>
@@ -412,22 +606,26 @@ export default function LocationPicker() {
 
                 {/* Location Items */}
                 {filteredLocations.map((location) => (
-                  <button
+                  <div
                     key={location.id}
-                    onClick={() => handleSelectLocation(location)}
                     className="flex w-full items-center gap-4 py-4 text-left transition-colors hover:bg-gray-50 -mx-4 px-4"
                   >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100">
-                      {getLocationIcon(location)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-gray-900">
-                        {location.label}
-                      </p>
-                      <p className="text-sm text-gray-500 truncate">
-                        {location.address}
-                      </p>
-                    </div>
+                    <button
+                      onClick={() => handleSelectLocation(location)}
+                      className="flex flex-1 items-center gap-4"
+                    >
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100">
+                        {getLocationIcon(location)}
+                      </div>
+                      <div className="flex-1 min-w-0 text-left">
+                        <p className="font-medium text-gray-900">
+                          {location.label}
+                        </p>
+                        <p className="text-sm text-gray-500 truncate">
+                          {location.address}
+                        </p>
+                      </div>
+                    </button>
                     <button
                       onClick={(e) => toggleFavorite(e, location.id)}
                       className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
@@ -441,7 +639,7 @@ export default function LocationPicker() {
                         )}
                       />
                     </button>
-                  </button>
+                  </div>
                 ))}
 
                 {filteredLocations.length === 0 && (

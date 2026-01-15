@@ -223,7 +223,7 @@ export function getPaymentMethodName(method: PaymentMethod): string {
     gcash: 'GCash',
     maya: 'Maya',
     card: 'Credit/Debit Card',
-    wallet: 'GOGO Wallet',
+    wallet: 'GOGO Express Wallet',
     cash: 'Cash',
   }
   return names[method] || method

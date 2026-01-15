@@ -20,14 +20,14 @@ export interface Category {
 
 const categories: Category[] = [
   { id: 'all', label: 'All', icon: Zap, iconColor: 'text-primary-600' },
-  { id: 'merienda', label: 'Merienda', icon: Coffee, iconColor: 'text-amber-600' },
-  { id: 'free-delivery', label: 'Free Delivery', icon: Truck, iconColor: 'text-green-600' },
-  { id: 'under-30', label: 'Under 30 min', icon: Clock, iconColor: 'text-blue-600' },
-  { id: 'promos', label: 'Promos', icon: Percent, iconColor: 'text-red-600' },
-  { id: 'filipino', label: 'Filipino', icon: Flag, iconColor: 'text-yellow-600' },
-  { id: 'fast-food', label: 'Fast Food', icon: Zap, iconColor: 'text-orange-600' },
-  { id: 'coffee', label: 'Coffee & Tea', icon: CupSoda, iconColor: 'text-brown-600' },
-  { id: 'budget', label: 'Budget Meals', icon: Coins, iconColor: 'text-emerald-600' }
+  { id: 'merienda', label: 'Merienda', icon: Coffee, iconColor: 'text-primary-500' },
+  { id: 'free-delivery', label: 'Free Delivery', icon: Truck, iconColor: 'text-success' },
+  { id: 'under-30', label: 'Under 30 min', icon: Clock, iconColor: 'text-info' },
+  { id: 'promos', label: 'Promos', icon: Percent, iconColor: 'text-secondary-500' },
+  { id: 'filipino', label: 'Filipino', icon: Flag, iconColor: 'text-warning' },
+  { id: 'fast-food', label: 'Fast Food', icon: Zap, iconColor: 'text-primary-400' },
+  { id: 'coffee', label: 'Coffee & Tea', icon: CupSoda, iconColor: 'text-secondary-600' },
+  { id: 'budget', label: 'Budget Meals', icon: Coins, iconColor: 'text-success' }
 ]
 
 interface CategoryPillsProps {

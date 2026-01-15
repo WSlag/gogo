@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AppLayout } from '@/components/layout'
 import { LoadingScreen } from '@/components/ui'
-import { ProtectedRoute } from '@/components/auth'
+import { ProtectedRoute, RoleProtectedRoute } from '@/components/auth'
 import { onAuthChange } from '@/services/firebase/auth'
 import { useAuthStore } from '@/store/authStore'
 
@@ -13,6 +13,7 @@ const Login = lazy(() => import('@/pages/auth/Login'))
 const OTPVerification = lazy(() => import('@/pages/auth/OTPVerification'))
 const Register = lazy(() => import('@/pages/auth/Register'))
 const Welcome = lazy(() => import('@/pages/auth/Welcome'))
+const Unauthorized = lazy(() => import('@/pages/auth/Unauthorized'))
 
 // Legal
 const Terms = lazy(() => import('@/pages/legal/Terms'))
@@ -35,6 +36,9 @@ const Checkout = lazy(() => import('@/pages/food/Checkout'))
 const GroceryHome = lazy(() => import('@/pages/grocery/GroceryHome'))
 const StoreDetail = lazy(() => import('@/pages/grocery/StoreDetail'))
 
+// Pharmacy
+const PharmacyHome = lazy(() => import('@/pages/pharmacy/PharmacyHome'))
+
 // Orders
 const OrderList = lazy(() => import('@/pages/orders/OrderList'))
 const OrderDetail = lazy(() => import('@/pages/orders/OrderDetail'))
@@ -50,12 +54,19 @@ const Settings = lazy(() => import('@/pages/account/Settings'))
 const Addresses = lazy(() => import('@/pages/account/Addresses'))
 const Support = lazy(() => import('@/pages/account/Support'))
 const HelpCenter = lazy(() => import('@/pages/account/HelpCenter'))
+const EditProfile = lazy(() => import('@/pages/account/EditProfile'))
+const PaymentMethods = lazy(() => import('@/pages/account/PaymentMethods'))
+const AccountNotifications = lazy(() => import('@/pages/account/AccountNotifications'))
+const PrivacySecurity = lazy(() => import('@/pages/account/PrivacySecurity'))
+const RateApp = lazy(() => import('@/pages/account/RateApp'))
+const ShareApp = lazy(() => import('@/pages/account/ShareApp'))
 
 // Driver Portal
 const DriverDashboard = lazy(() => import('@/pages/driver/DriverDashboard'))
 const DriverEarnings = lazy(() => import('@/pages/driver/DriverEarnings'))
 const DriverRegistration = lazy(() => import('@/pages/driver/DriverRegistration'))
 const DriverActiveRide = lazy(() => import('@/pages/driver/DriverActiveRide'))
+const DriverActiveDelivery = lazy(() => import('@/pages/driver/DriverActiveDelivery'))
 const DriverHistory = lazy(() => import('@/pages/driver/DriverHistory'))
 
 // Merchant Portal
@@ -72,6 +83,7 @@ const AdminDrivers = lazy(() => import('@/pages/admin/AdminDrivers'))
 const AdminMerchants = lazy(() => import('@/pages/admin/AdminMerchants'))
 const AdminApprovals = lazy(() => import('@/pages/admin/AdminApprovals'))
 const AdminOrders = lazy(() => import('@/pages/admin/AdminOrders'))
+const SeedData = lazy(() => import('@/pages/admin/SeedData'))
 
 // Driver Portal - Additional Pages
 const DriverProfile = lazy(() => import('@/pages/driver/DriverProfile'))
@@ -127,6 +139,7 @@ function App() {
               <Route path="/auth/login" element={<Login />} />
               <Route path="/auth/otp" element={<OTPVerification />} />
               <Route path="/auth/register" element={<Register />} />
+              <Route path="/unauthorized" element={<Unauthorized />} />
 
               {/* Legal Routes (no layout) */}
               <Route path="/terms" element={<Terms />} />
@@ -140,6 +153,8 @@ function App() {
                 <Route path="/food/restaurant/:id" element={<RestaurantDetail />} />
                 <Route path="/grocery" element={<GroceryHome />} />
                 <Route path="/grocery/store/:id" element={<StoreDetail />} />
+                <Route path="/pharmacy" element={<PharmacyHome />} />
+                <Route path="/pharmacy/store/:id" element={<StoreDetail />} />
 
                 {/* Rides - browsable, auth required on booking action */}
                 <Route path="/rides" element={<RideHome />} />
@@ -250,35 +265,250 @@ function App() {
                     </ProtectedRoute>
                   }
                 />
+                <Route
+                  path="/account/edit"
+                  element={
+                    <ProtectedRoute>
+                      <EditProfile />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/account/payment"
+                  element={
+                    <ProtectedRoute>
+                      <PaymentMethods />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/account/notifications"
+                  element={
+                    <ProtectedRoute>
+                      <AccountNotifications />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/account/privacy"
+                  element={
+                    <ProtectedRoute>
+                      <PrivacySecurity />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/rate"
+                  element={
+                    <ProtectedRoute>
+                      <RateApp />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/share"
+                  element={
+                    <ProtectedRoute>
+                      <ShareApp />
+                    </ProtectedRoute>
+                  }
+                />
                 <Route path="/help" element={<HelpCenter />} />
               </Route>
 
               {/* Driver Portal Routes (no bottom nav layout) */}
-              <Route path="/driver" element={<DriverDashboard />} />
-              <Route path="/driver/register" element={<DriverRegistration />} />
-              <Route path="/driver/earnings" element={<DriverEarnings />} />
-              <Route path="/driver/active" element={<DriverActiveRide />} />
-              <Route path="/driver/history" element={<DriverHistory />} />
-              <Route path="/driver/profile" element={<DriverProfile />} />
-              <Route path="/driver/stats" element={<DriverStats />} />
+              {/* Registration is accessible to any authenticated user who wants to become a driver */}
+              <Route
+                path="/driver/register"
+                element={
+                  <ProtectedRoute>
+                    <DriverRegistration />
+                  </ProtectedRoute>
+                }
+              />
+              {/* All other driver routes require driver or admin role */}
+              <Route
+                path="/driver"
+                element={
+                  <RoleProtectedRoute allowedRoles={['driver', 'admin']}>
+                    <DriverDashboard />
+                  </RoleProtectedRoute>
+                }
+              />
+              <Route
+                path="/driver/earnings"
+                element={
+                  <RoleProtectedRoute allowedRoles={['driver', 'admin']}>
+                    <DriverEarnings />
+                  </RoleProtectedRoute>
+                }
+              />
+              <Route
+                path="/driver/active"
+                element={
+                  <RoleProtectedRoute allowedRoles={['driver', 'admin']}>
+                    <DriverActiveRide />
+                  </RoleProtectedRoute>
+                }
+              />
+              <Route
+                path="/driver/delivery"
+                element={
+                  <RoleProtectedRoute allowedRoles={['driver', 'admin']}>
+                    <DriverActiveDelivery />
+                  </RoleProtectedRoute>
+                }
+              />
+              <Route
+                path="/driver/history"
+                element={
+                  <RoleProtectedRoute allowedRoles={['driver', 'admin']}>
+                    <DriverHistory />
+                  </RoleProtectedRoute>
+                }
+              />
+              <Route
+                path="/driver/profile"
+                element={
+                  <RoleProtectedRoute allowedRoles={['driver', 'admin']}>
+                    <DriverProfile />
+                  </RoleProtectedRoute>
+                }
+              />
+              <Route
+                path="/driver/stats"
+                element={
+                  <RoleProtectedRoute allowedRoles={['driver', 'admin']}>
+                    <DriverStats />
+                  </RoleProtectedRoute>
+                }
+              />
 
               {/* Merchant Portal Routes (no bottom nav layout) */}
-              <Route path="/merchant" element={<MerchantDashboard />} />
-              <Route path="/merchant/register" element={<MerchantRegistration />} />
-              <Route path="/merchant/orders" element={<MerchantOrders />} />
-              <Route path="/merchant/menu" element={<MerchantMenu />} />
-              <Route path="/merchant/settings" element={<MerchantSettings />} />
-              <Route path="/merchant/earnings" element={<MerchantEarnings />} />
-              <Route path="/merchant/analytics" element={<MerchantAnalytics />} />
+              {/* Registration is accessible to any authenticated user who wants to become a merchant */}
+              <Route
+                path="/merchant/register"
+                element={
+                  <ProtectedRoute>
+                    <MerchantRegistration />
+                  </ProtectedRoute>
+                }
+              />
+              {/* All other merchant routes require merchant or admin role */}
+              <Route
+                path="/merchant"
+                element={
+                  <RoleProtectedRoute allowedRoles={['merchant', 'admin']}>
+                    <MerchantDashboard />
+                  </RoleProtectedRoute>
+                }
+              />
+              <Route
+                path="/merchant/orders"
+                element={
+                  <RoleProtectedRoute allowedRoles={['merchant', 'admin']}>
+                    <MerchantOrders />
+                  </RoleProtectedRoute>
+                }
+              />
+              <Route
+                path="/merchant/menu"
+                element={
+                  <RoleProtectedRoute allowedRoles={['merchant', 'admin']}>
+                    <MerchantMenu />
+                  </RoleProtectedRoute>
+                }
+              />
+              <Route
+                path="/merchant/settings"
+                element={
+                  <RoleProtectedRoute allowedRoles={['merchant', 'admin']}>
+                    <MerchantSettings />
+                  </RoleProtectedRoute>
+                }
+              />
+              <Route
+                path="/merchant/earnings"
+                element={
+                  <RoleProtectedRoute allowedRoles={['merchant', 'admin']}>
+                    <MerchantEarnings />
+                  </RoleProtectedRoute>
+                }
+              />
+              <Route
+                path="/merchant/analytics"
+                element={
+                  <RoleProtectedRoute allowedRoles={['merchant', 'admin']}>
+                    <MerchantAnalytics />
+                  </RoleProtectedRoute>
+                }
+              />
 
-              {/* Admin Portal Routes */}
-              <Route path="/admin" element={<AdminDashboard />} />
-              <Route path="/admin/users" element={<AdminUsers />} />
-              <Route path="/admin/analytics" element={<AdminAnalytics />} />
-              <Route path="/admin/drivers" element={<AdminDrivers />} />
-              <Route path="/admin/merchants" element={<AdminMerchants />} />
-              <Route path="/admin/approvals" element={<AdminApprovals />} />
-              <Route path="/admin/orders" element={<AdminOrders />} />
+              {/* Admin Portal Routes - admin role only */}
+              <Route
+                path="/admin"
+                element={
+                  <RoleProtectedRoute allowedRoles={['admin']}>
+                    <AdminDashboard />
+                  </RoleProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/users"
+                element={
+                  <RoleProtectedRoute allowedRoles={['admin']}>
+                    <AdminUsers />
+                  </RoleProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/analytics"
+                element={
+                  <RoleProtectedRoute allowedRoles={['admin']}>
+                    <AdminAnalytics />
+                  </RoleProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/drivers"
+                element={
+                  <RoleProtectedRoute allowedRoles={['admin']}>
+                    <AdminDrivers />
+                  </RoleProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/merchants"
+                element={
+                  <RoleProtectedRoute allowedRoles={['admin']}>
+                    <AdminMerchants />
+                  </RoleProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/approvals"
+                element={
+                  <RoleProtectedRoute allowedRoles={['admin']}>
+                    <AdminApprovals />
+                  </RoleProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/orders"
+                element={
+                  <RoleProtectedRoute allowedRoles={['admin']}>
+                    <AdminOrders />
+                  </RoleProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/seed"
+                element={
+                  <RoleProtectedRoute allowedRoles={['admin']}>
+                    <SeedData />
+                  </RoleProtectedRoute>
+                }
+              />
 
               {/* Notifications */}
               <Route

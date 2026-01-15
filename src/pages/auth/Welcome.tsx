@@ -20,7 +20,7 @@ export default function Welcome() {
           G
         </div>
 
-        <h1 className="text-3xl font-bold text-gray-900 text-center">Welcome to GOGO</h1>
+        <h1 className="text-3xl font-bold text-gray-900 text-center">Welcome to GOGO Express</h1>
         <p className="mt-3 text-gray-500 text-center max-w-xs">
           Your all-in-one app for rides, food delivery, and grocery shopping in the Philippines
         </p>

@@ -108,7 +108,7 @@ export default function BookRide() {
   const paymentMethods = [
     { id: 'cash', label: 'Cash', icon: Banknote, description: 'Pay with cash' },
     { id: 'gcash', label: 'GCash', icon: CreditCard, description: 'Pay via GCash' },
-    { id: 'wallet', label: 'GOGO Wallet', icon: Wallet, description: 'Pay from wallet balance' },
+    { id: 'wallet', label: 'GOGO Express Wallet', icon: Wallet, description: 'Pay from wallet balance' },
   ]
 
   if (!pickup || !dropoff) {
@@ -116,9 +116,9 @@ export default function BookRide() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-32">
+    <div className="min-h-screen bg-gray-50 pb-40">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-white px-4 py-3 shadow-sm">
+      <div className="sticky top-0 z-30 lg:top-16 bg-white px-4 py-3 shadow-sm">
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate(-1)}
@@ -133,7 +133,7 @@ export default function BookRide() {
       <div className="p-4 space-y-4">
         {/* Error Message */}
         {error && (
-          <div className="flex items-center gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-600">
+          <div className="flex items-center gap-2 rounded-lg bg-error-light p-3 text-sm text-error">
             <AlertCircle className="h-5 w-5 flex-shrink-0" />
             <span>{error}</span>
           </div>
@@ -286,12 +286,12 @@ export default function BookRide() {
           {promoCode ? (
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-50">
-                  <Tag className="h-5 w-5 text-green-600" />
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success-light">
+                  <Tag className="h-5 w-5 text-success" />
                 </div>
                 <div>
                   <p className="font-medium text-gray-900">{promoCode.code}</p>
-                  <p className="text-sm text-green-600">
+                  <p className="text-sm text-success">
                     {promoCode.type === 'percentage'
                       ? `${promoCode.value}% off`
                       : promoCode.type === 'fixed'
@@ -380,8 +380,8 @@ export default function BookRide() {
               )}
               {fare.discount && fare.discount > 0 && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-green-600">Discount</span>
-                  <span className="text-green-600">-₱{fare.discount.toFixed(2)}</span>
+                  <span className="text-success">Discount</span>
+                  <span className="text-success">-₱{fare.discount.toFixed(2)}</span>
                 </div>
               )}
               <div className="border-t pt-2 mt-2 flex justify-between font-semibold">
@@ -396,8 +396,8 @@ export default function BookRide() {
       </div>
 
       {/* Bottom CTA */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 pb-safe">
-        <div className="max-w-lg mx-auto">
+      <div className="fixed bottom-[56px] lg:bottom-0 left-0 right-0 lg:left-[240px] bg-white border-t shadow-lg z-40">
+        <div className="max-w-lg mx-auto p-4">
           <div className="flex items-center justify-between mb-3">
             <span className="text-gray-500">Total Fare</span>
             <span className="text-2xl font-bold text-gray-900">

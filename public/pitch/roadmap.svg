@@ -1,0 +1,173 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 950 580" width="950" height="580">
+  <defs>
+    <linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#9333ea"/>
+      <stop offset="100%" style="stop-color:#a855f7"/>
+    </linearGradient>
+    <linearGradient id="greenGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#10b981"/>
+      <stop offset="100%" style="stop-color:#34d399"/>
+    </linearGradient>
+    <linearGradient id="timelineGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#e9d5ff"/>
+      <stop offset="100%" style="stop-color:#a855f7"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="950" height="580" fill="white"/>
+
+  <!-- Title -->
+  <text x="475" y="40" font-family="Inter, Arial, sans-serif" font-size="26" font-weight="700" fill="#191919" text-anchor="middle">12-Month Growth Roadmap</text>
+  <text x="475" y="65" font-family="Inter, Arial, sans-serif" font-size="13" fill="#71717a" text-anchor="middle">Cotabato City Launch → Regional Expansion</text>
+
+  <!-- Timeline Base -->
+  <rect x="80" y="250" width="790" height="8" rx="4" fill="url(#timelineGrad)"/>
+
+  <!-- Phase 1: Month 1-3 - Launch -->
+  <g transform="translate(100, 105)">
+    <circle cx="45" cy="149" r="18" fill="url(#purpleGrad)"/>
+    <text x="45" y="155" font-family="Inter, Arial, sans-serif" font-size="14" fill="white" text-anchor="middle" font-weight="700">1</text>
+    <line x1="45" y1="131" x2="45" y2="10" stroke="#e9d5ff" stroke-width="2" stroke-dasharray="4,4"/>
+
+    <rect x="0" y="0" width="130" height="120" rx="12" fill="#f3e8ff" stroke="#e9d5ff" stroke-width="2"/>
+    <text x="65" y="22" font-family="Inter, Arial, sans-serif" font-size="10" fill="#9333ea" text-anchor="middle" font-weight="700">MONTH 1-3</text>
+    <text x="65" y="42" font-family="Inter, Arial, sans-serif" font-size="14" fill="#191919" text-anchor="middle" font-weight="600">LAUNCH</text>
+
+    <text x="12" y="62" font-family="Inter, Arial, sans-serif" font-size="10" fill="#71717a">• 100 drivers onboarded</text>
+    <text x="12" y="76" font-family="Inter, Arial, sans-serif" font-size="10" fill="#71717a">• 30 merchant partners</text>
+    <text x="12" y="90" font-family="Inter, Arial, sans-serif" font-size="10" fill="#71717a">• 1,000 active users</text>
+    <text x="12" y="104" font-family="Inter, Arial, sans-serif" font-size="10" fill="#71717a">• ₱500K GMV/month</text>
+  </g>
+
+  <!-- Phase 2: Month 4-6 - Growth -->
+  <g transform="translate(280, 105)">
+    <circle cx="45" cy="149" r="18" fill="url(#purpleGrad)"/>
+    <text x="45" y="155" font-family="Inter, Arial, sans-serif" font-size="14" fill="white" text-anchor="middle" font-weight="700">2</text>
+    <line x1="45" y1="131" x2="45" y2="10" stroke="#d8b4fe" stroke-width="2" stroke-dasharray="4,4"/>
+
+    <rect x="0" y="0" width="130" height="120" rx="12" fill="#f3e8ff" stroke="#d8b4fe" stroke-width="2"/>
+    <text x="65" y="22" font-family="Inter, Arial, sans-serif" font-size="10" fill="#9333ea" text-anchor="middle" font-weight="700">MONTH 4-6</text>
+    <text x="65" y="42" font-family="Inter, Arial, sans-serif" font-size="14" fill="#191919" text-anchor="middle" font-weight="600">GROWTH</text>
+
+    <text x="12" y="62" font-family="Inter, Arial, sans-serif" font-size="10" fill="#71717a">• 200 active drivers</text>
+    <text x="12" y="76" font-family="Inter, Arial, sans-serif" font-size="10" fill="#71717a">• 60 restaurants</text>
+    <text x="12" y="90" font-family="Inter, Arial, sans-serif" font-size="10" fill="#71717a">• 3,000 users</text>
+    <text x="12" y="104" font-family="Inter, Arial, sans-serif" font-size="10" fill="#71717a">• ₱1.2M GMV/month</text>
+  </g>
+
+  <!-- Phase 3: Month 7-9 - Scale -->
+  <g transform="translate(460, 105)">
+    <circle cx="45" cy="149" r="18" fill="url(#purpleGrad)"/>
+    <text x="45" y="155" font-family="Inter, Arial, sans-serif" font-size="14" fill="white" text-anchor="middle" font-weight="700">3</text>
+    <line x1="45" y1="131" x2="45" y2="10" stroke="#c084fc" stroke-width="2" stroke-dasharray="4,4"/>
+
+    <rect x="0" y="0" width="130" height="120" rx="12" fill="#f3e8ff" stroke="#c084fc" stroke-width="2"/>
+    <text x="65" y="22" font-family="Inter, Arial, sans-serif" font-size="10" fill="#9333ea" text-anchor="middle" font-weight="700">MONTH 7-9</text>
+    <text x="65" y="42" font-family="Inter, Arial, sans-serif" font-size="14" fill="#191919" text-anchor="middle" font-weight="600">SCALE</text>
+
+    <text x="12" y="62" font-family="Inter, Arial, sans-serif" font-size="10" fill="#71717a">• 350 drivers</text>
+    <text x="12" y="76" font-family="Inter, Arial, sans-serif" font-size="10" fill="#71717a">• Grocery launch</text>
+    <text x="12" y="90" font-family="Inter, Arial, sans-serif" font-size="10" fill="#71717a">• 6,000 users</text>
+    <text x="12" y="104" font-family="Inter, Arial, sans-serif" font-size="10" fill="#71717a">• ₱2M GMV/month</text>
+  </g>
+
+  <!-- Phase 4: Month 10-12 - Expand -->
+  <g transform="translate(640, 105)">
+    <circle cx="45" cy="149" r="18" fill="url(#greenGrad)"/>
+    <text x="45" y="155" font-family="Inter, Arial, sans-serif" font-size="14" fill="white" text-anchor="middle" font-weight="700">4</text>
+    <line x1="45" y1="131" x2="45" y2="10" stroke="#10b981" stroke-width="2" stroke-dasharray="4,4"/>
+
+    <rect x="0" y="0" width="130" height="120" rx="12" fill="#ecfdf5" stroke="#10b981" stroke-width="2"/>
+    <text x="65" y="22" font-family="Inter, Arial, sans-serif" font-size="10" fill="#10b981" text-anchor="middle" font-weight="700">MONTH 10-12</text>
+    <text x="65" y="42" font-family="Inter, Arial, sans-serif" font-size="14" fill="#191919" text-anchor="middle" font-weight="600">EXPAND</text>
+
+    <text x="12" y="62" font-family="Inter, Arial, sans-serif" font-size="10" fill="#71717a">• Nearby municipalities</text>
+    <text x="12" y="76" font-family="Inter, Arial, sans-serif" font-size="10" fill="#71717a">• 500+ drivers</text>
+    <text x="12" y="90" font-family="Inter, Arial, sans-serif" font-size="10" fill="#71717a">• 10,000 users</text>
+    <text x="12" y="104" font-family="Inter, Arial, sans-serif" font-size="10" fill="#71717a">• ₱3M+ GMV/month</text>
+  </g>
+
+  <!-- Year 2 Preview -->
+  <g transform="translate(800, 130)">
+    <rect x="0" y="0" width="120" height="95" rx="12" fill="#191919"/>
+    <text x="60" y="22" font-family="Inter, Arial, sans-serif" font-size="10" fill="white" text-anchor="middle" opacity="0.8">YEAR 2</text>
+    <text x="60" y="42" font-family="Inter, Arial, sans-serif" font-size="12" fill="white" text-anchor="middle" font-weight="600">REGIONAL</text>
+
+    <text x="12" y="62" font-family="Inter, Arial, sans-serif" font-size="9" fill="white" opacity="0.8">• GenSan City</text>
+    <text x="12" y="74" font-family="Inter, Arial, sans-serif" font-size="9" fill="white" opacity="0.8">• Kidapawan</text>
+    <text x="12" y="86" font-family="Inter, Arial, sans-serif" font-size="9" fill="white" opacity="0.8">• Koronadal</text>
+  </g>
+
+  <!-- Metrics Row -->
+  <g transform="translate(80, 295)">
+    <rect x="0" y="0" width="150" height="85" rx="12" fill="#f3e8ff"/>
+    <text x="75" y="25" font-family="Inter, Arial, sans-serif" font-size="11" fill="#71717a" text-anchor="middle">Year 1 Users</text>
+    <text x="75" y="52" font-family="Inter, Arial, sans-serif" font-size="28" fill="#9333ea" text-anchor="middle" font-weight="700">10,000</text>
+    <text x="75" y="72" font-family="Inter, Arial, sans-serif" font-size="10" fill="#a1a1aa" text-anchor="middle">Active customers</text>
+  </g>
+
+  <g transform="translate(250, 295)">
+    <rect x="0" y="0" width="150" height="85" rx="12" fill="#f3e8ff"/>
+    <text x="75" y="25" font-family="Inter, Arial, sans-serif" font-size="11" fill="#71717a" text-anchor="middle">Year 1 Drivers</text>
+    <text x="75" y="52" font-family="Inter, Arial, sans-serif" font-size="28" fill="#9333ea" text-anchor="middle" font-weight="700">500+</text>
+    <text x="75" y="72" font-family="Inter, Arial, sans-serif" font-size="10" fill="#a1a1aa" text-anchor="middle">Onboarded partners</text>
+  </g>
+
+  <g transform="translate(420, 295)">
+    <rect x="0" y="0" width="150" height="85" rx="12" fill="#f3e8ff"/>
+    <text x="75" y="25" font-family="Inter, Arial, sans-serif" font-size="11" fill="#71717a" text-anchor="middle">Monthly GMV</text>
+    <text x="75" y="52" font-family="Inter, Arial, sans-serif" font-size="28" fill="#9333ea" text-anchor="middle" font-weight="700">₱3M</text>
+    <text x="75" y="72" font-family="Inter, Arial, sans-serif" font-size="10" fill="#a1a1aa" text-anchor="middle">By month 12</text>
+  </g>
+
+  <g transform="translate(590, 295)">
+    <rect x="0" y="0" width="150" height="85" rx="12" fill="#e9d5ff"/>
+    <text x="75" y="25" font-family="Inter, Arial, sans-serif" font-size="11" fill="#71717a" text-anchor="middle">Year 1 Revenue</text>
+    <text x="75" y="52" font-family="Inter, Arial, sans-serif" font-size="26" fill="#7c3aed" text-anchor="middle" font-weight="700">₱6.7M</text>
+    <text x="75" y="72" font-family="Inter, Arial, sans-serif" font-size="10" fill="#a1a1aa" text-anchor="middle">20% commission</text>
+  </g>
+
+  <g transform="translate(760, 295)">
+    <rect x="0" y="0" width="150" height="85" rx="12" fill="url(#greenGrad)"/>
+    <text x="75" y="25" font-family="Inter, Arial, sans-serif" font-size="11" fill="white" text-anchor="middle" opacity="0.9">Next Round</text>
+    <text x="75" y="52" font-family="Inter, Arial, sans-serif" font-size="22" fill="white" text-anchor="middle" font-weight="700">SEED</text>
+    <text x="75" y="72" font-family="Inter, Arial, sans-serif" font-size="10" fill="white" text-anchor="middle" opacity="0.9">₱5M-10M target</text>
+  </g>
+
+  <!-- Bottom Section - Expansion Cities -->
+  <rect x="80" y="410" width="790" height="90" rx="16" fill="#faf5ff" stroke="#e9d5ff" stroke-width="2"/>
+
+  <text x="180" y="440" font-family="Inter, Arial, sans-serif" font-size="14" fill="#191919" font-weight="600">Expansion Path:</text>
+
+  <!-- City 1 -->
+  <g transform="translate(280, 425)">
+    <rect x="0" y="0" width="130" height="55" rx="10" fill="url(#purpleGrad)"/>
+    <text x="65" y="22" font-family="Inter, Arial, sans-serif" font-size="12" fill="white" text-anchor="middle" font-weight="600">Cotabato City</text>
+    <text x="65" y="40" font-family="Inter, Arial, sans-serif" font-size="10" fill="white" text-anchor="middle" opacity="0.9">383K pop • Year 1</text>
+  </g>
+
+  <!-- Arrow -->
+  <text x="425" y="457" font-family="Inter, Arial, sans-serif" font-size="20" fill="#d8b4fe">→</text>
+
+  <!-- City 2 -->
+  <g transform="translate(450, 425)">
+    <rect x="0" y="0" width="130" height="55" rx="10" fill="#e9d5ff"/>
+    <text x="65" y="22" font-family="Inter, Arial, sans-serif" font-size="12" fill="#7c3aed" text-anchor="middle" font-weight="600">GenSan City</text>
+    <text x="65" y="40" font-family="Inter, Arial, sans-serif" font-size="10" fill="#71717a" text-anchor="middle">697K pop • Year 2</text>
+  </g>
+
+  <!-- Arrow -->
+  <text x="595" y="457" font-family="Inter, Arial, sans-serif" font-size="20" fill="#d8b4fe">→</text>
+
+  <!-- City 3 -->
+  <g transform="translate(620, 425)">
+    <rect x="0" y="0" width="130" height="55" rx="10" fill="#f3e8ff"/>
+    <text x="65" y="22" font-family="Inter, Arial, sans-serif" font-size="12" fill="#9333ea" text-anchor="middle" font-weight="600">Davao City</text>
+    <text x="65" y="40" font-family="Inter, Arial, sans-serif" font-size="10" fill="#71717a" text-anchor="middle">1.8M pop • Year 3</text>
+  </g>
+
+  <!-- Footer -->
+  <text x="475" y="540" font-family="Inter, Arial, sans-serif" font-size="12" fill="#191919" text-anchor="middle" font-weight="600">Start Small → Prove Model → Scale Fast</text>
+  <text x="475" y="560" font-family="Inter, Arial, sans-serif" font-size="10" fill="#a1a1aa" text-anchor="middle">Conservative estimates based on market research • Actual results may vary</text>
+</svg>

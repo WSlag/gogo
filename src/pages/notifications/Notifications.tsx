@@ -202,7 +202,7 @@ export default function Notifications() {
   return (
     <div className="min-h-screen bg-gray-100 pb-6">
       {/* Header */}
-      <div className="bg-white border-b sticky top-0 z-10">
+      <div className="bg-white border-b sticky top-0 z-30 lg:top-16">
         <div className="flex items-center justify-between px-4 py-4">
           <div className="flex items-center gap-3">
             <button onClick={() => navigate(-1)} className="p-1">
@@ -444,8 +444,8 @@ const MOCK_NOTIFICATIONS: Notification[] = [
   {
     id: '6',
     type: 'system',
-    title: 'Welcome to GOGO!',
-    message: 'Thanks for joining GOGO. Enjoy ₱100 off your first ride with code NEWUSER.',
+    title: 'Welcome to GOGO Express!',
+    message: 'Thanks for joining GOGO Express. Enjoy ₱100 off your first ride with code NEWUSER.',
     isRead: true,
     createdAt: new Date(Date.now() - 604800000),
     data: { promoCode: 'NEWUSER' },

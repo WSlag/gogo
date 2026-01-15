@@ -20,7 +20,7 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage((payload) => {
   console.log('Received background message:', payload);
 
-  const notificationTitle = payload.notification?.title || 'GOGO';
+  const notificationTitle = payload.notification?.title || 'GOGO Express';
   const notificationOptions = {
     body: payload.notification?.body || '',
     icon: '/icons/icon-192x192.png',

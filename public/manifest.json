@@ -1,6 +1,6 @@
 {
-  "name": "GOGO - Rides, Food & Grocery",
-  "short_name": "GOGO",
+  "name": "GOGO Express - Rides, Food & Grocery",
+  "short_name": "GOGO Express",
   "description": "Your all-in-one super app for rides, food delivery, and grocery delivery in the Philippines",
   "start_url": "/",
   "display": "standalone",

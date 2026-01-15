@@ -1,7 +1,10 @@
 import type { Timestamp, GeoPoint } from 'firebase/firestore'
 
+export type UserRole = 'customer' | 'driver' | 'merchant' | 'admin'
+
 export interface User {
   id: string
+  role: UserRole
   phone: string
   email?: string
   firstName: string

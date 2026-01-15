@@ -9,24 +9,24 @@ import {
   Mail,
   MapPin,
   CheckCircle,
-  XCircle,
-  Clock,
   MoreVertical,
   Eye,
   Ban,
-  MessageSquare,
-  DollarSign,
   ShoppingBag,
   TrendingUp,
+  Loader2,
+  FileText,
 } from 'lucide-react'
-import { Card, Avatar, Badge, Button, Modal } from '@/components/ui'
-import { collection, query, where, orderBy, getDocs, doc, updateDoc, Timestamp } from 'firebase/firestore'
+import { PesoSign } from '@/components/icons'
+import { Card, Badge, Button, Modal } from '@/components/ui'
+import { collection, getDocs, doc, updateDoc, Timestamp } from 'firebase/firestore'
 import { db } from '@/services/firebase/config'
 
 interface Merchant {
   id: string
   businessName: string
   ownerName: string
+  ownerId?: string
   email: string
   phone: string
   photoURL?: string
@@ -35,19 +35,21 @@ interface Merchant {
   status: 'open' | 'closed' | 'busy'
   isApproved: boolean
   isSuspended: boolean
+  isPending: boolean
   rating: number
   totalOrders: number
   totalRevenue: number
   commissionRate: number
   joinedAt: Date
   documents?: {
-    businessPermit: string
-    sanitaryPermit: string
-    bir: string
+    businessPermit?: string
+    sanitaryPermit?: string
+    bir?: string
+    dti?: string
   }
 }
 
-type FilterStatus = 'all' | 'open' | 'closed' | 'suspended'
+type FilterStatus = 'all' | 'pending' | 'open' | 'closed' | 'suspended'
 type FilterCategory = 'all' | 'restaurant' | 'grocery' | 'convenience' | 'pharmacy'
 
 export default function AdminMerchants() {
@@ -60,6 +62,11 @@ export default function AdminMerchants() {
   const [selectedMerchant, setSelectedMerchant] = useState<Merchant | null>(null)
   const [showMerchantModal, setShowMerchantModal] = useState(false)
   const [showActionMenu, setShowActionMenu] = useState<string | null>(null)
+  const [approving, setApproving] = useState<string | null>(null)
+  const [showApprovalModal, setShowApprovalModal] = useState(false)
+  const [pendingMerchant, setPendingMerchant] = useState<Merchant | null>(null)
+  const [rejectionReason, setRejectionReason] = useState('')
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   useEffect(() => {
     fetchMerchants()
@@ -68,42 +75,46 @@ export default function AdminMerchants() {
   const fetchMerchants = async () => {
     setLoading(true)
     try {
-      let q = query(
-        collection(db, 'merchants'),
-        where('isApproved', '==', true),
-        orderBy('createdAt', 'desc')
-      )
-
-      const snapshot = await getDocs(q)
-      const merchantData: Merchant[] = snapshot.docs.map((doc) => {
-        const data = doc.data()
-        return {
-          id: doc.id,
-          businessName: data.businessName || 'Unknown',
-          ownerName: data.ownerName || '',
-          email: data.email || '',
-          phone: data.phone || '',
-          photoURL: data.photoURL,
-          category: data.category || 'restaurant',
-          address: data.address || '',
-          status: data.status || 'closed',
-          isApproved: data.isApproved || false,
-          isSuspended: data.isSuspended || false,
-          rating: data.rating || 0,
-          totalOrders: data.totalOrders || 0,
-          totalRevenue: data.totalRevenue || 0,
-          commissionRate: data.commissionRate || 15,
-          joinedAt: data.createdAt?.toDate() || new Date(),
-          documents: data.documents,
-        }
-      })
+      // Simple query without composite index requirement
+      // We'll do client-side sorting to avoid needing a composite index
+      const snapshot = await getDocs(collection(db, 'merchants'))
+      const merchantData: Merchant[] = snapshot.docs
+        .map((doc) => {
+          const data = doc.data()
+          const isVerified = data.verified || data.isApproved || false
+          const isSuspended = data.isSuspended || false
+          return {
+            id: doc.id,
+            businessName: data.businessName || 'Unknown',
+            ownerName: data.ownerName || '',
+            ownerId: data.ownerId,
+            email: data.email || '',
+            phone: data.phone || '',
+            photoURL: data.photoURL,
+            category: data.category || data.type || 'restaurant',
+            address: data.address || '',
+            status: data.status || 'closed',
+            isApproved: isVerified,
+            isSuspended: isSuspended,
+            isPending: !isVerified && !isSuspended && !data.rejectedAt,
+            rating: data.rating || 0,
+            totalOrders: data.totalOrders || 0,
+            totalRevenue: data.totalRevenue || 0,
+            commissionRate: data.commissionRate || 15,
+            joinedAt: data.createdAt?.toDate() || new Date(),
+            documents: data.documents,
+          }
+        })
+        .sort((a, b) => b.joinedAt.getTime() - a.joinedAt.getTime()) // Sort by newest first
 
       // Apply client-side filters
       let filtered = merchantData
-      if (filterStatus === 'suspended') {
+      if (filterStatus === 'pending') {
+        filtered = merchantData.filter((m) => m.isPending)
+      } else if (filterStatus === 'suspended') {
         filtered = merchantData.filter((m) => m.isSuspended)
       } else if (filterStatus !== 'all') {
-        filtered = merchantData.filter((m) => m.status === filterStatus && !m.isSuspended)
+        filtered = merchantData.filter((m) => m.status === filterStatus && !m.isSuspended && m.isApproved)
       }
 
       if (filterCategory !== 'all') {
@@ -117,6 +128,64 @@ export default function AdminMerchants() {
       setMerchants(MOCK_MERCHANTS)
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Approve a pending merchant
+  const handleApproveMerchant = async (merchantId: string, ownerId?: string) => {
+    setApproving(merchantId)
+    try {
+      await updateDoc(doc(db, 'merchants', merchantId), {
+        verified: true,
+        isApproved: true,
+        verifiedAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      })
+
+      // Also update the user's role in users collection if ownerId exists
+      if (ownerId) {
+        await updateDoc(doc(db, 'users', ownerId), {
+          role: 'merchant',
+          updatedAt: Timestamp.now(),
+        })
+      }
+
+      setMessage({ type: 'success', text: 'Merchant approved successfully! They can now receive orders.' })
+      setShowApprovalModal(false)
+      setPendingMerchant(null)
+      fetchMerchants()
+    } catch (error) {
+      console.error('Error approving merchant:', error)
+      setMessage({ type: 'error', text: 'Failed to approve merchant. Please try again.' })
+    } finally {
+      setApproving(null)
+      setTimeout(() => setMessage(null), 5000)
+    }
+  }
+
+  // Reject a pending merchant
+  const handleRejectMerchant = async (merchantId: string, reason: string) => {
+    setApproving(merchantId)
+    try {
+      await updateDoc(doc(db, 'merchants', merchantId), {
+        verified: false,
+        isApproved: false,
+        rejectedAt: Timestamp.now(),
+        rejectionReason: reason || 'Application did not meet requirements',
+        updatedAt: Timestamp.now(),
+      })
+
+      setMessage({ type: 'success', text: 'Merchant application rejected.' })
+      setShowApprovalModal(false)
+      setPendingMerchant(null)
+      setRejectionReason('')
+      fetchMerchants()
+    } catch (error) {
+      console.error('Error rejecting merchant:', error)
+      setMessage({ type: 'error', text: 'Failed to reject merchant. Please try again.' })
+    } finally {
+      setApproving(null)
+      setTimeout(() => setMessage(null), 5000)
     }
   }
 
@@ -145,8 +214,14 @@ export default function AdminMerchants() {
   })
 
   const getStatusBadge = (merchant: Merchant) => {
+    if (merchant.isPending) {
+      return <Badge variant="warning">Pending Approval</Badge>
+    }
     if (merchant.isSuspended) {
       return <Badge variant="error">Suspended</Badge>
+    }
+    if (!merchant.isApproved) {
+      return <Badge variant="error">Rejected</Badge>
     }
     switch (merchant.status) {
       case 'open':
@@ -173,11 +248,21 @@ export default function AdminMerchants() {
     }
   }
 
+  // Calculate stats from all merchants
+  const [allMerchants, setAllMerchants] = useState<Merchant[]>([])
+
+  useEffect(() => {
+    if (filterStatus === 'all' && filterCategory === 'all') {
+      setAllMerchants(merchants)
+    }
+  }, [merchants, filterStatus, filterCategory])
+
   const stats = {
-    total: merchants.length,
-    open: merchants.filter((m) => m.status === 'open' && !m.isSuspended).length,
-    closed: merchants.filter((m) => m.status === 'closed' && !m.isSuspended).length,
-    suspended: merchants.filter((m) => m.isSuspended).length,
+    total: allMerchants.length || merchants.length,
+    pending: (allMerchants.length ? allMerchants : merchants).filter((m) => m.isPending).length,
+    open: (allMerchants.length ? allMerchants : merchants).filter((m) => m.status === 'open' && !m.isSuspended && m.isApproved).length,
+    closed: (allMerchants.length ? allMerchants : merchants).filter((m) => m.status === 'closed' && !m.isSuspended && m.isApproved).length,
+    suspended: (allMerchants.length ? allMerchants : merchants).filter((m) => m.isSuspended).length,
   }
 
   return (
@@ -195,22 +280,42 @@ export default function AdminMerchants() {
         </div>
       </div>
 
+      {/* Message */}
+      {message && (
+        <div className={`mx-4 mt-4 p-3 rounded-lg text-sm ${
+          message.type === 'success'
+            ? 'bg-green-100 text-green-800 border border-green-200'
+            : 'bg-red-100 text-red-800 border border-red-200'
+        }`}>
+          {message.text}
+        </div>
+      )}
+
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-3 p-4">
+      <div className="grid grid-cols-5 gap-2 p-4">
         <div className="bg-white rounded-xl p-3 text-center">
-          <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+          <p className="text-xl font-bold text-gray-900">{stats.total}</p>
           <p className="text-xs text-gray-500">Total</p>
         </div>
+        <div className="bg-orange-50 rounded-xl p-3 text-center relative">
+          <p className="text-xl font-bold text-orange-600">{stats.pending}</p>
+          <p className="text-xs text-gray-500">Pending</p>
+          {stats.pending > 0 && (
+            <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
+              {stats.pending}
+            </span>
+          )}
+        </div>
         <div className="bg-green-50 rounded-xl p-3 text-center">
-          <p className="text-2xl font-bold text-green-600">{stats.open}</p>
+          <p className="text-xl font-bold text-green-600">{stats.open}</p>
           <p className="text-xs text-gray-500">Open</p>
         </div>
         <div className="bg-gray-100 rounded-xl p-3 text-center">
-          <p className="text-2xl font-bold text-gray-600">{stats.closed}</p>
+          <p className="text-xl font-bold text-gray-600">{stats.closed}</p>
           <p className="text-xs text-gray-500">Closed</p>
         </div>
         <div className="bg-red-50 rounded-xl p-3 text-center">
-          <p className="text-2xl font-bold text-red-600">{stats.suspended}</p>
+          <p className="text-xl font-bold text-red-600">{stats.suspended}</p>
           <p className="text-xs text-gray-500">Suspended</p>
         </div>
       </div>
@@ -229,17 +334,22 @@ export default function AdminMerchants() {
         </div>
 
         <div className="flex gap-2 overflow-x-auto pb-2">
-          {(['all', 'open', 'closed', 'suspended'] as FilterStatus[]).map((status) => (
+          {(['all', 'pending', 'open', 'closed', 'suspended'] as FilterStatus[]).map((status) => (
             <button
               key={status}
               onClick={() => setFilterStatus(status)}
-              className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap ${
+              className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap relative ${
                 filterStatus === status
-                  ? 'bg-gray-900 text-white'
+                  ? status === 'pending' ? 'bg-orange-500 text-white' : 'bg-gray-900 text-white'
                   : 'bg-white text-gray-600'
               }`}
             >
               {status.charAt(0).toUpperCase() + status.slice(1)}
+              {status === 'pending' && stats.pending > 0 && filterStatus !== 'pending' && (
+                <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-xs w-4 h-4 rounded-full flex items-center justify-center">
+                  {stats.pending}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -323,7 +433,32 @@ export default function AdminMerchants() {
                         View Store
                       </button>
                       <hr className="my-2" />
-                      {merchant.isSuspended ? (
+                      {merchant.isPending ? (
+                        <>
+                          <button
+                            onClick={() => {
+                              setPendingMerchant(merchant)
+                              setShowApprovalModal(true)
+                              setShowActionMenu(null)
+                            }}
+                            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-green-600"
+                          >
+                            <CheckCircle className="h-4 w-4" />
+                            Review & Approve
+                          </button>
+                          <button
+                            onClick={() => {
+                              setPendingMerchant(merchant)
+                              setShowApprovalModal(true)
+                              setShowActionMenu(null)
+                            }}
+                            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-red-600"
+                          >
+                            <Ban className="h-4 w-4" />
+                            Reject Application
+                          </button>
+                        </>
+                      ) : merchant.isSuspended ? (
                         <button
                           onClick={() => handleSuspendMerchant(merchant.id, false)}
                           className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-green-600"
@@ -331,7 +466,7 @@ export default function AdminMerchants() {
                           <CheckCircle className="h-4 w-4" />
                           Unsuspend
                         </button>
-                      ) : (
+                      ) : merchant.isApproved ? (
                         <button
                           onClick={() => handleSuspendMerchant(merchant.id, true)}
                           className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-red-600"
@@ -339,7 +474,7 @@ export default function AdminMerchants() {
                           <Ban className="h-4 w-4" />
                           Suspend Merchant
                         </button>
-                      )}
+                      ) : null}
                     </div>
                   )}
                 </div>
@@ -385,7 +520,7 @@ export default function AdminMerchants() {
               </div>
               <div className="bg-gray-50 rounded-xl p-3">
                 <div className="flex items-center gap-2 text-gray-500 mb-1">
-                  <DollarSign className="h-4 w-4" />
+                  <PesoSign className="h-4 w-4" />
                   <span className="text-sm">Revenue</span>
                 </div>
                 <p className="text-xl font-bold">₱{selectedMerchant.totalRevenue.toLocaleString()}</p>
@@ -436,7 +571,18 @@ export default function AdminMerchants() {
                 <Phone className="h-4 w-4 mr-2" />
                 Call
               </Button>
-              {selectedMerchant.isSuspended ? (
+              {selectedMerchant.isPending ? (
+                <Button
+                  fullWidth
+                  onClick={() => {
+                    setPendingMerchant(selectedMerchant)
+                    setShowMerchantModal(false)
+                    setShowApprovalModal(true)
+                  }}
+                >
+                  Review Application
+                </Button>
+              ) : selectedMerchant.isSuspended ? (
                 <Button
                   fullWidth
                   onClick={() => {
@@ -446,9 +592,9 @@ export default function AdminMerchants() {
                 >
                   Unsuspend
                 </Button>
-              ) : (
+              ) : selectedMerchant.isApproved ? (
                 <Button
-                  variant="destructive"
+                  variant="danger"
                   fullWidth
                   onClick={() => {
                     handleSuspendMerchant(selectedMerchant.id, true)
@@ -457,7 +603,121 @@ export default function AdminMerchants() {
                 >
                   Suspend
                 </Button>
-              )}
+              ) : null}
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Merchant Approval Modal */}
+      {pendingMerchant && (
+        <Modal
+          isOpen={showApprovalModal}
+          onClose={() => {
+            setShowApprovalModal(false)
+            setPendingMerchant(null)
+            setRejectionReason('')
+          }}
+          title="Review Merchant Application"
+        >
+          <div className="space-y-4">
+            {/* Merchant Info Header */}
+            <div className="flex items-center gap-4 pb-4 border-b">
+              <div className="w-14 h-14 bg-orange-100 rounded-xl flex items-center justify-center text-2xl">
+                {getCategoryIcon(pendingMerchant.category)}
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">{pendingMerchant.businessName}</h3>
+                <p className="text-sm text-gray-500">{pendingMerchant.ownerName}</p>
+                <Badge variant="secondary">{pendingMerchant.category}</Badge>
+              </div>
+            </div>
+
+            {/* Contact Information */}
+            <div className="space-y-2">
+              <h4 className="font-medium text-gray-900">Contact Information</h4>
+              <div className="bg-gray-50 rounded-xl p-3 space-y-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <Phone className="h-4 w-4 text-gray-400" />
+                  <span>{pendingMerchant.phone || 'Not provided'}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <Mail className="h-4 w-4 text-gray-400" />
+                  <span>{pendingMerchant.email || 'Not provided'}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <MapPin className="h-4 w-4 text-gray-400" />
+                  <span>{pendingMerchant.address || 'Not provided'}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Documents Status */}
+            <div className="space-y-2">
+              <h4 className="font-medium text-gray-900 flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Document Verification
+              </h4>
+              <div className="grid grid-cols-2 gap-2">
+                <div className={`p-2 rounded-lg text-sm ${pendingMerchant.documents?.businessPermit ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                  {pendingMerchant.documents?.businessPermit ? '✓' : '○'} Business Permit
+                </div>
+                <div className={`p-2 rounded-lg text-sm ${pendingMerchant.documents?.sanitaryPermit ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                  {pendingMerchant.documents?.sanitaryPermit ? '✓' : '○'} Sanitary Permit
+                </div>
+                <div className={`p-2 rounded-lg text-sm ${pendingMerchant.documents?.bir ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                  {pendingMerchant.documents?.bir ? '✓' : '○'} BIR Registration
+                </div>
+                <div className={`p-2 rounded-lg text-sm ${pendingMerchant.documents?.dti ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                  {pendingMerchant.documents?.dti ? '✓' : '○'} DTI Registration
+                </div>
+              </div>
+            </div>
+
+            {/* Application Date */}
+            <div className="text-sm text-gray-500">
+              Applied: {pendingMerchant.joinedAt.toLocaleDateString()} ({Math.floor((Date.now() - pendingMerchant.joinedAt.getTime()) / (1000 * 60 * 60 * 24))} days ago)
+            </div>
+
+            {/* Rejection Reason Input */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Rejection Reason (optional)</label>
+              <textarea
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                placeholder="Enter reason if rejecting..."
+                className="w-full p-3 border rounded-xl text-sm resize-none"
+                rows={2}
+              />
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-3 pt-4">
+              <Button
+                variant="danger"
+                fullWidth
+                onClick={() => handleRejectMerchant(pendingMerchant.id, rejectionReason)}
+                disabled={approving === pendingMerchant.id}
+              >
+                {approving === pendingMerchant.id ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Ban className="h-4 w-4 mr-2" />
+                )}
+                Reject
+              </Button>
+              <Button
+                fullWidth
+                onClick={() => handleApproveMerchant(pendingMerchant.id, pendingMerchant.ownerId)}
+                disabled={approving === pendingMerchant.id}
+              >
+                {approving === pendingMerchant.id ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                )}
+                Approve Merchant
+              </Button>
             </div>
           </div>
         </Modal>
@@ -479,6 +739,7 @@ const MOCK_MERCHANTS: Merchant[] = [
     status: 'open',
     isApproved: true,
     isSuspended: false,
+    isPending: false,
     rating: 4.7,
     totalOrders: 15420,
     totalRevenue: 7850000,
@@ -496,6 +757,7 @@ const MOCK_MERCHANTS: Merchant[] = [
     status: 'open',
     isApproved: true,
     isSuspended: false,
+    isPending: false,
     rating: 4.5,
     totalOrders: 8900,
     totalRevenue: 4500000,
@@ -504,18 +766,19 @@ const MOCK_MERCHANTS: Merchant[] = [
   },
   {
     id: '3',
-    businessName: '7-Eleven Taft',
-    ownerName: 'Manager Name',
-    email: '7eleven@example.com',
+    businessName: 'New Sari-Sari Store',
+    ownerName: 'Maria Santos',
+    email: 'saristore@example.com',
     phone: '+639555123456',
     category: 'convenience',
     address: 'Taft Avenue, Manila',
-    status: 'open',
-    isApproved: true,
+    status: 'closed',
+    isApproved: false,
     isSuspended: false,
-    rating: 4.3,
-    totalOrders: 5600,
-    totalRevenue: 1200000,
+    isPending: true,
+    rating: 0,
+    totalOrders: 0,
+    totalRevenue: 0,
     commissionRate: 10,
     joinedAt: new Date('2024-03-01'),
   },
@@ -530,6 +793,7 @@ const MOCK_MERCHANTS: Merchant[] = [
     status: 'closed',
     isApproved: true,
     isSuspended: false,
+    isPending: false,
     rating: 4.8,
     totalOrders: 3200,
     totalRevenue: 980000,

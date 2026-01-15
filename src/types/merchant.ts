@@ -14,22 +14,29 @@ export interface Merchant {
   name: string
   type: MerchantType
   description: string
-  logo: string
-  coverImage: string
+  logo?: string
+  coverImage?: string
+  image?: string // Primary display image
   categories: string[]
+  category?: string // Primary category (e.g., "Fast Food", "Filipino")
+  cuisine?: string[] // Cuisine types (e.g., ["Filipino", "Fast Food", "Chicken"])
   address: string
   coordinates: GeoPoint
   phone: string
   email: string
-  operatingHours: OperatingHours[]
+  operatingHours: OperatingHours[] | Record<string, { open: string; close: string }>
   rating: number
-  totalOrders: number
+  totalOrders?: number
   reviewCount: number
   deliveryFee: number
   minOrder: number
-  estimatedDelivery: string
+  estimatedDelivery?: string
+  deliveryTime?: string // Display format like "20-30 min"
+  priceRange?: string // e.g., "₱", "₱₱", "₱₱₱"
   isOpen: boolean
   isFeatured: boolean
+  verified?: boolean
+  promo?: string // Active promo text (e.g., "20% Off")
   status: 'active' | 'suspended' | 'closed'
   createdAt: Timestamp
   updatedAt: Timestamp

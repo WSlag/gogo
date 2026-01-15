@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
-  DollarSign,
   TrendingUp,
   TrendingDown,
   Calendar,
@@ -12,6 +11,7 @@ import {
   Package,
   CreditCard,
 } from 'lucide-react'
+import { PesoSign } from '@/components/icons'
 import { Button, Card } from '@/components/ui'
 
 type TimeFilter = 'today' | 'week' | 'month' | 'year'
@@ -55,11 +55,11 @@ export default function DriverEarnings() {
       case 'delivery':
         return Package
       case 'tip':
-        return DollarSign
+        return PesoSign
       case 'bonus':
         return TrendingUp
       default:
-        return DollarSign
+        return PesoSign
     }
   }
 
@@ -149,7 +149,7 @@ export default function DriverEarnings() {
       </div>
 
       {/* Time Filter */}
-      <div className="px-4 py-3 bg-white border-b sticky top-0 z-10">
+      <div className="px-4 py-3 bg-white border-b sticky top-0 z-30 lg:top-16">
         <div className="flex gap-2">
           {(['today', 'week', 'month', 'year'] as const).map((filter) => (
             <button

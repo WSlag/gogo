@@ -2,12 +2,20 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { CartItem, Cart, MerchantType } from '@/types'
 
+interface MerchantInfo {
+  merchantId: string
+  merchantName: string
+  merchantType: MerchantType
+  deliveryFee?: number
+  minOrder?: number
+}
+
 interface CartState {
   cart: Cart | null
   itemCount: number
 
   // Actions
-  addItem: (item: CartItem, merchantId: string, merchantName: string, merchantType: MerchantType) => void
+  addItem: (item: CartItem, merchant: MerchantInfo) => void
   updateQuantity: (productId: string, quantity: number) => void
   removeItem: (productId: string) => void
   clearCart: () => void
@@ -30,19 +38,22 @@ export const useCartStore = create<CartState>()(
       cart: null,
       itemCount: 0,
 
-      addItem: (item, merchantId, merchantName, merchantType) => {
+      addItem: (item, merchant) => {
         const { cart } = get()
+        const { merchantId, merchantName, merchantType, deliveryFee: merchantDeliveryFee, minOrder } = merchant
 
         // If cart exists and is from different merchant, clear it
         if (cart && cart.merchantId !== merchantId) {
+          const deliveryFee = merchantDeliveryFee ?? 49
           set({
             cart: {
               merchantId,
               merchantName,
               merchantType,
               items: [item],
-              deliveryFee: 49,
-              ...calculateTotals([item], 49),
+              deliveryFee,
+              minOrder,
+              ...calculateTotals([item], deliveryFee),
             },
             itemCount: item.quantity,
           })
@@ -72,7 +83,7 @@ export const useCartStore = create<CartState>()(
           newItems = [...existingItems, item]
         }
 
-        const deliveryFee = cart?.deliveryFee || 49
+        const deliveryFee = cart?.deliveryFee ?? merchantDeliveryFee ?? 49
         const totals = calculateTotals(newItems, deliveryFee)
 
         set({
@@ -82,6 +93,7 @@ export const useCartStore = create<CartState>()(
             merchantType,
             items: newItems,
             deliveryFee,
+            minOrder: cart?.minOrder ?? minOrder,
             ...totals,
           },
           itemCount: newItems.reduce((sum, i) => sum + i.quantity, 0),

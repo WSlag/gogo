@@ -112,7 +112,7 @@ const FAQ_CATEGORIES: FAQCategory[] = [
       },
       {
         question: 'What payment methods are accepted?',
-        answer: 'We accept GOGO Wallet, GCash, Maya, credit/debit cards, and cash on delivery (for applicable services).',
+        answer: 'We accept GOGO Express Wallet, GCash, Maya, credit/debit cards, and cash on delivery (for applicable services).',
       },
       {
         question: 'How do I get a refund?',
@@ -166,7 +166,7 @@ export default function HelpCenter() {
   return (
     <div className="min-h-screen bg-gray-50 pb-8">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-white px-4 py-3 shadow-sm">
+      <div className="sticky top-0 z-30 lg:top-16 bg-white px-4 py-3 shadow-sm">
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate(-1)}
@@ -203,7 +203,7 @@ export default function HelpCenter() {
               <span className="text-xs font-medium text-primary-600">Live Chat</span>
             </button>
             <a
-              href="tel:+639XXXXXXXXX"
+              href="tel:+639171234567"
               className="flex flex-col items-center gap-2 rounded-lg bg-green-50 p-3 transition hover:bg-green-100"
             >
               <Phone className="h-6 w-6 text-green-600" />

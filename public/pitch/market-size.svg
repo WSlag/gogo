@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 550" width="900" height="550">
+  <defs>
+    <linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#9333ea"/>
+      <stop offset="100%" style="stop-color:#a855f7"/>
+    </linearGradient>
+    <linearGradient id="lightPurple" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#e9d5ff"/>
+      <stop offset="100%" style="stop-color:#f3e8ff"/>
+    </linearGradient>
+    <linearGradient id="greenGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#10b981"/>
+      <stop offset="100%" style="stop-color:#34d399"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="550" fill="white"/>
+
+  <!-- Title -->
+  <text x="450" y="45" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="700" fill="#191919" text-anchor="middle">Market Opportunity</text>
+  <text x="450" y="70" font-family="Inter, Arial, sans-serif" font-size="14" fill="#71717a" text-anchor="middle">Cotabato City: Untapped Blue Ocean Market</text>
+
+  <!-- TAM Circle (Largest) -->
+  <circle cx="320" cy="290" r="170" fill="#f3e8ff" stroke="#e9d5ff" stroke-width="3"/>
+
+  <!-- SAM Circle (Medium) -->
+  <circle cx="320" cy="310" r="110" fill="#e9d5ff" stroke="#d8b4fe" stroke-width="3"/>
+
+  <!-- SOM Circle (Smallest - Target) -->
+  <circle cx="320" cy="330" r="55" fill="url(#purpleGrad)"/>
+
+  <!-- Circle Labels -->
+  <text x="320" y="145" font-family="Inter, Arial, sans-serif" font-size="12" fill="#6b21a8" text-anchor="middle" font-weight="600">TAM</text>
+  <text x="320" y="220" font-family="Inter, Arial, sans-serif" font-size="11" fill="#7c3aed" text-anchor="middle" font-weight="600">SAM</text>
+  <text x="320" y="320" font-family="Inter, Arial, sans-serif" font-size="11" fill="white" text-anchor="middle" font-weight="600">SOM</text>
+  <text x="320" y="338" font-family="Inter, Arial, sans-serif" font-size="9" fill="white" text-anchor="middle">Year 1</text>
+
+  <!-- Value Cards - Left Column -->
+  <g transform="translate(30, 130)">
+    <rect x="0" y="0" width="130" height="65" rx="10" fill="#f3e8ff"/>
+    <text x="65" y="25" font-family="Inter, Arial, sans-serif" font-size="18" fill="#9333ea" text-anchor="middle" font-weight="700">$837M</text>
+    <text x="65" y="42" font-family="Inter, Arial, sans-serif" font-size="10" fill="#71717a" text-anchor="middle">PH Ride-Hailing</text>
+    <text x="65" y="55" font-family="Inter, Arial, sans-serif" font-size="9" fill="#a1a1aa" text-anchor="middle">2025 Market</text>
+  </g>
+
+  <g transform="translate(30, 220)">
+    <rect x="0" y="0" width="130" height="65" rx="10" fill="#e9d5ff"/>
+    <text x="65" y="25" font-family="Inter, Arial, sans-serif" font-size="18" fill="#7c3aed" text-anchor="middle" font-weight="700">500K</text>
+    <text x="65" y="42" font-family="Inter, Arial, sans-serif" font-size="10" fill="#71717a" text-anchor="middle">Cotabato Metro</text>
+    <text x="65" y="55" font-family="Inter, Arial, sans-serif" font-size="9" fill="#a1a1aa" text-anchor="middle">Population</text>
+  </g>
+
+  <g transform="translate(30, 310)">
+    <rect x="0" y="0" width="130" height="65" rx="10" fill="url(#purpleGrad)"/>
+    <text x="65" y="25" font-family="Inter, Arial, sans-serif" font-size="18" fill="white" text-anchor="middle" font-weight="700">₱6.7M</text>
+    <text x="65" y="42" font-family="Inter, Arial, sans-serif" font-size="10" fill="white" text-anchor="middle" opacity="0.9">Year 1 Revenue</text>
+    <text x="65" y="55" font-family="Inter, Arial, sans-serif" font-size="9" fill="white" text-anchor="middle" opacity="0.8">Conservative</text>
+  </g>
+
+  <!-- Connecting lines -->
+  <line x1="160" y1="162" x2="200" y2="180" stroke="#d8b4fe" stroke-width="2" stroke-dasharray="4,4"/>
+  <line x1="160" y1="252" x2="230" y2="270" stroke="#c084fc" stroke-width="2" stroke-dasharray="4,4"/>
+  <line x1="160" y1="342" x2="275" y2="340" stroke="#a855f7" stroke-width="2" stroke-dasharray="4,4"/>
+
+  <!-- Right Side - Key Stats Panel -->
+  <rect x="530" y="100" width="340" height="400" rx="16" fill="#faf5ff" stroke="#e9d5ff" stroke-width="2"/>
+
+  <!-- Panel Title -->
+  <text x="700" y="135" font-family="Inter, Arial, sans-serif" font-size="16" fill="#191919" text-anchor="middle" font-weight="700">Why Cotabato City?</text>
+
+  <!-- Stat 1: Population -->
+  <g transform="translate(555, 160)">
+    <circle cx="20" cy="15" r="15" fill="url(#purpleGrad)"/>
+    <text x="20" y="20" font-family="Inter, Arial, sans-serif" font-size="12" fill="white" text-anchor="middle" font-weight="700">1</text>
+    <text x="50" y="12" font-family="Inter, Arial, sans-serif" font-size="13" fill="#191919" font-weight="600">Population: 383,383</text>
+    <text x="50" y="28" font-family="Inter, Arial, sans-serif" font-size="11" fill="#71717a">BARMM Regional Capital</text>
+  </g>
+
+  <!-- Stat 2: Zero Competition -->
+  <g transform="translate(555, 210)">
+    <circle cx="20" cy="15" r="15" fill="url(#greenGrad)"/>
+    <text x="20" y="20" font-family="Inter, Arial, sans-serif" font-size="12" fill="white" text-anchor="middle" font-weight="700">2</text>
+    <text x="50" y="12" font-family="Inter, Arial, sans-serif" font-size="13" fill="#191919" font-weight="600">ZERO Ride-Hailing Apps</text>
+    <text x="50" y="28" font-family="Inter, Arial, sans-serif" font-size="11" fill="#71717a">No Grab, No Angkas, No Maxim</text>
+  </g>
+
+  <!-- Stat 3: KCC Mall -->
+  <g transform="translate(555, 260)">
+    <circle cx="20" cy="15" r="15" fill="url(#purpleGrad)"/>
+    <text x="20" y="20" font-family="Inter, Arial, sans-serif" font-size="12" fill="white" text-anchor="middle" font-weight="700">3</text>
+    <text x="50" y="12" font-family="Inter, Arial, sans-serif" font-size="13" fill="#191919" font-weight="600">₱10B KCC Mall (2025)</text>
+    <text x="50" y="28" font-family="Inter, Arial, sans-serif" font-size="11" fill="#71717a">10,000 jobs, 500 tenants</text>
+  </g>
+
+  <!-- Stat 4: E-wallet -->
+  <g transform="translate(555, 310)">
+    <circle cx="20" cy="15" r="15" fill="url(#purpleGrad)"/>
+    <text x="20" y="20" font-family="Inter, Arial, sans-serif" font-size="12" fill="white" text-anchor="middle" font-weight="700">4</text>
+    <text x="50" y="12" font-family="Inter, Arial, sans-serif" font-size="13" fill="#191919" font-weight="600">92% E-wallet Adoption</text>
+    <text x="50" y="28" font-family="Inter, Arial, sans-serif" font-size="11" fill="#71717a">GCash: 81M users nationwide</text>
+  </g>
+
+  <!-- Stat 5: BARMM Budget -->
+  <g transform="translate(555, 360)">
+    <circle cx="20" cy="15" r="15" fill="url(#purpleGrad)"/>
+    <text x="20" y="20" font-family="Inter, Arial, sans-serif" font-size="12" fill="white" text-anchor="middle" font-weight="700">5</text>
+    <text x="50" y="12" font-family="Inter, Arial, sans-serif" font-size="13" fill="#191919" font-weight="600">₱114B BARMM Budget</text>
+    <text x="50" y="28" font-family="Inter, Arial, sans-serif" font-size="11" fill="#71717a">+20% increase for 2026</text>
+  </g>
+
+  <!-- Stat 6: Limited Food Delivery -->
+  <g transform="translate(555, 410)">
+    <circle cx="20" cy="15" r="15" fill="url(#greenGrad)"/>
+    <text x="20" y="20" font-family="Inter, Arial, sans-serif" font-size="12" fill="white" text-anchor="middle" font-weight="700">6</text>
+    <text x="50" y="12" font-family="Inter, Arial, sans-serif" font-size="13" fill="#191919" font-weight="600">Only Foodpanda (Limited)</text>
+    <text x="50" y="28" font-family="Inter, Arial, sans-serif" font-size="11" fill="#71717a">No integrated super-app exists</text>
+  </g>
+
+  <!-- Bottom Growth Indicator -->
+  <g transform="translate(555, 460)">
+    <rect x="0" y="0" width="150" height="35" rx="8" fill="url(#greenGrad)"/>
+    <text x="75" y="15" font-family="Inter, Arial, sans-serif" font-size="11" fill="white" text-anchor="middle" opacity="0.9">PH Market CAGR</text>
+    <text x="75" y="30" font-family="Inter, Arial, sans-serif" font-size="14" fill="white" text-anchor="middle" font-weight="700">9.69%</text>
+  </g>
+
+  <g transform="translate(715, 460)">
+    <rect x="0" y="0" width="150" height="35" rx="8" fill="#191919"/>
+    <text x="75" y="15" font-family="Inter, Arial, sans-serif" font-size="11" fill="white" text-anchor="middle" opacity="0.9">Internet Users</text>
+    <text x="75" y="30" font-family="Inter, Arial, sans-serif" font-size="14" fill="white" text-anchor="middle" font-weight="700">89% of PH</text>
+  </g>
+
+  <!-- Footer -->
+  <text x="450" y="530" font-family="Inter, Arial, sans-serif" font-size="10" fill="#a1a1aa" text-anchor="middle">Sources: PSA 2024 Census, Statista Ride-Hailing Report, BARMM Official Data</text>
+</svg>

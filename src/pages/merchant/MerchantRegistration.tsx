@@ -241,7 +241,7 @@ export default function MerchantRegistration() {
           </div>
           <h2 className="text-xl font-bold text-gray-900 mb-2">Application Submitted!</h2>
           <p className="text-gray-600 mb-6">
-            Thank you for applying to become a GOGO merchant partner. We'll review your application and get back to you within 3-5 business days.
+            Thank you for applying to become a GOGO Express merchant partner. We'll review your application and get back to you within 3-5 business days.
           </p>
           <Button fullWidth onClick={() => navigate('/')}>
             Return Home

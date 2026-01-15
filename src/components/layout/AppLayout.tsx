@@ -3,6 +3,7 @@ import { Home, ShoppingBag, Car, Package, User, Wallet, UtensilsCrossed, MapPin,
 import { BottomNav } from './BottomNav'
 import { Toast } from './Toast'
 import { cn } from '@/utils/cn'
+import { useAuthStore } from '@/store/authStore'
 
 const sidebarItems = [
   { path: '/', label: 'Home', icon: Home },
@@ -16,6 +17,16 @@ const sidebarItems = [
 
 export function AppLayout() {
   const location = useLocation()
+  const { profile, isAuthenticated } = useAuthStore()
+
+  // Get user display info
+  const userInitials = profile?.firstName && profile?.lastName
+    ? `${profile.firstName[0]}${profile.lastName[0]}`.toUpperCase()
+    : profile?.firstName?.[0]?.toUpperCase() || ''
+  const userFullName = profile?.firstName && profile?.lastName
+    ? `${profile.firstName} ${profile.lastName}`
+    : profile?.firstName || ''
+  const userPhone = profile?.phone || ''
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -23,7 +34,7 @@ export function AppLayout() {
       <header className="hidden lg:flex fixed top-0 left-0 right-0 z-50 h-16 items-center bg-white border-b border-gray-200">
         {/* Logo - aligned with sidebar */}
         <div className="flex items-center justify-start w-[240px] shrink-0 px-6">
-          <span className="text-2xl font-bold text-primary-600 tracking-tight">GOGO</span>
+          <span className="text-2xl font-bold text-primary-600 tracking-tight">GOGO Express</span>
         </div>
 
         {/* Center - Search Bar (40% width) */}
@@ -104,21 +115,23 @@ export function AppLayout() {
           </NavLink>
         </nav>
 
-        {/* User Section - Clean profile card at bottom */}
-        <div className="border-t border-gray-200 p-3">
-          <NavLink
-            to="/account"
-            className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-100 transition-colors"
-          >
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-900 text-xs font-bold text-white">
-              JD
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">Juan Dela Cruz</p>
-              <p className="text-xs text-gray-500 truncate">+63 917 123 4567</p>
-            </div>
-          </NavLink>
-        </div>
+        {/* User Section - Clean profile card at bottom (only show when authenticated) */}
+        {isAuthenticated && profile && (
+          <div className="border-t border-gray-200 p-3">
+            <NavLink
+              to="/account"
+              className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-100 transition-colors"
+            >
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-900 text-xs font-bold text-white">
+                {userInitials}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">{userFullName}</p>
+                <p className="text-xs text-gray-500 truncate">{userPhone}</p>
+              </div>
+            </NavLink>
+          </div>
+        )}
       </aside>
 
       {/* Main Content - proper margin for sidebar */}

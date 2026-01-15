@@ -3,28 +3,23 @@ import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
   Search,
-  Filter,
   ShoppingBag,
   Car,
-  Clock,
-  CheckCircle,
-  XCircle,
   MapPin,
   Phone,
-  Eye,
-  MoreVertical,
   Package,
   Utensils,
   RefreshCw,
+  Pill,
 } from 'lucide-react'
-import { Card, Badge, Button, Modal, Avatar } from '@/components/ui'
-import { collection, query, where, orderBy, getDocs, limit, Timestamp } from 'firebase/firestore'
+import { Card, Badge, Modal, Avatar } from '@/components/ui'
+import { collection, query, orderBy, getDocs, limit } from 'firebase/firestore'
 import { db } from '@/services/firebase/config'
 
 interface Order {
   id: string
   orderNumber: string
-  type: 'food' | 'grocery' | 'ride'
+  type: 'food' | 'grocery' | 'ride' | 'pharmacy'
   status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'picked_up' | 'on_the_way' | 'delivered' | 'cancelled'
   customer: {
     name: string
@@ -52,7 +47,7 @@ interface Order {
 }
 
 type FilterStatus = 'all' | 'active' | 'completed' | 'cancelled'
-type FilterType = 'all' | 'food' | 'grocery' | 'ride'
+type FilterType = 'all' | 'food' | 'grocery' | 'ride' | 'pharmacy'
 
 export default function AdminOrders() {
   const navigate = useNavigate()
@@ -94,7 +89,9 @@ export default function AdminOrders() {
           merchant: data.merchant,
           driver: data.driver,
           pickup: data.pickupAddress || data.merchant?.address || '',
-          dropoff: data.deliveryAddress || '',
+          dropoff: typeof data.deliveryAddress === 'string'
+            ? data.deliveryAddress
+            : data.deliveryAddress?.address || '',
           items: data.items,
           subtotal: data.subtotal || 0,
           deliveryFee: data.deliveryFee || 0,
@@ -176,6 +173,8 @@ export default function AdminOrders() {
         return <Utensils className="h-5 w-5 text-orange-600" />
       case 'grocery':
         return <ShoppingBag className="h-5 w-5 text-green-600" />
+      case 'pharmacy':
+        return <Pill className="h-5 w-5 text-red-600" />
       case 'ride':
         return <Car className="h-5 w-5 text-blue-600" />
       default:
@@ -274,7 +273,7 @@ export default function AdminOrders() {
         </div>
 
         <div className="flex gap-2 overflow-x-auto pb-2">
-          {(['all', 'food', 'grocery', 'ride'] as FilterType[]).map((type) => (
+          {(['all', 'food', 'grocery', 'pharmacy', 'ride'] as FilterType[]).map((type) => (
             <button
               key={type}
               onClick={() => setFilterType(type)}
@@ -310,7 +309,8 @@ export default function AdminOrders() {
               <div className="flex items-start gap-3">
                 <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
                   order.type === 'food' ? 'bg-orange-100' :
-                  order.type === 'grocery' ? 'bg-green-100' : 'bg-blue-100'
+                  order.type === 'grocery' ? 'bg-green-100' :
+                  order.type === 'pharmacy' ? 'bg-red-100' : 'bg-blue-100'
                 }`}>
                   {getTypeIcon(order.type)}
                 </div>
@@ -566,7 +566,7 @@ const MOCK_ORDERS: Order[] = [
     id: '4',
     orderNumber: 'RID001',
     type: 'ride',
-    status: 'completed',
+    status: 'delivered',
     customer: {
       name: 'Carlos Tan',
       phone: '+639333444555',

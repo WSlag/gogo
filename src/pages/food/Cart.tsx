@@ -27,8 +27,8 @@ export default function Cart() {
         <p className="mt-2 text-center text-gray-500">
           Add items from a restaurant to start your order
         </p>
-        <Button className="mt-6" onClick={() => navigate('/food')}>
-          Browse Restaurants
+        <Button className="mt-6" onClick={() => navigate('/')}>
+          Continue Shopping
         </Button>
       </div>
     )
@@ -37,11 +37,12 @@ export default function Cart() {
   const subtotal = cart.items.reduce((sum, item) => sum + item.price * item.quantity, 0)
   const serviceFee = Math.round(subtotal * 0.05) // 5% service fee
   const total = subtotal + cart.deliveryFee + serviceFee
+  const minOrder = cart.minOrder || 0 // Use merchant's minimum order or 0 if not set
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-32">
+    <div className="min-h-screen bg-gray-50 pb-44">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-white px-4 py-3 shadow-sm">
+      <div className="sticky top-0 z-30 lg:top-16 bg-white px-4 py-3 shadow-sm">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
@@ -54,7 +55,7 @@ export default function Cart() {
           </div>
           <button
             onClick={clearCart}
-            className="rounded-full p-2 text-red-500 hover:bg-red-50"
+            className="rounded-full p-2 text-error hover:bg-error-light"
           >
             <Trash2 className="h-5 w-5" />
           </button>
@@ -73,7 +74,15 @@ export default function Cart() {
               <p className="text-sm text-gray-500 capitalize">{cart.merchantType}</p>
             </div>
             <button
-              onClick={() => navigate(`/food/restaurant/${cart.merchantId}`)}
+              onClick={() => {
+                if (cart.merchantType === 'grocery') {
+                  navigate(`/grocery/store/${cart.merchantId}`)
+                } else if (cart.merchantType === 'pharmacy') {
+                  navigate(`/pharmacy/store/${cart.merchantId}`)
+                } else {
+                  navigate(`/food/restaurant/${cart.merchantId}`)
+                }
+              }}
               className="text-sm font-medium text-primary-600"
             >
               Add More
@@ -95,7 +104,7 @@ export default function Cart() {
                   />
                 ) : (
                   <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-gray-100 text-xl">
-                    🍴
+                    {cart.merchantType === 'grocery' ? '🛒' : cart.merchantType === 'pharmacy' ? '💊' : '🍴'}
                   </div>
                 )}
                 <div className="flex-1">
@@ -117,7 +126,7 @@ export default function Cart() {
                 <div className="flex flex-col items-end justify-between">
                   <button
                     onClick={() => removeItem(item.productId)}
-                    className="p-1 text-gray-400 hover:text-red-500"
+                    className="p-1 text-gray-400 hover:text-error"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -188,13 +197,13 @@ export default function Cart() {
         </Card>
 
         {/* Minimum Order Warning */}
-        {subtotal < 99 && (
-          <div className="flex items-start gap-2 rounded-lg bg-yellow-50 p-3 text-sm text-yellow-700">
+        {minOrder > 0 && subtotal < minOrder && (
+          <div className="flex items-start gap-2 rounded-lg bg-warning-light p-3 text-sm text-warning">
             <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
             <div>
               <p className="font-medium">Minimum order not met</p>
-              <p className="text-yellow-600">
-                Add ₱{(99 - subtotal).toFixed(2)} more to place your order
+              <p className="opacity-80">
+                Add ₱{(minOrder - subtotal).toFixed(2)} more to place your order
               </p>
             </div>
           </div>
@@ -202,7 +211,7 @@ export default function Cart() {
       </div>
 
       {/* Bottom CTA */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 pb-safe">
+      <div className="fixed bottom-16 left-0 right-0 lg:bottom-0 lg:left-[240px] bg-white border-t p-4 pb-safe z-50">
         <div className="max-w-lg mx-auto">
           <div className="flex items-center justify-between mb-3">
             <span className="text-gray-500">
@@ -218,7 +227,7 @@ export default function Cart() {
               if (!checkAuthAndRedirect()) return
               navigate('/checkout')
             }}
-            disabled={subtotal < 99}
+            disabled={minOrder > 0 && subtotal < minOrder}
           >
             Proceed to Checkout
           </Button>

@@ -19,6 +19,8 @@ interface MapViewProps {
   destination?: { lat: number; lng: number }
   onMapClick?: (lat: number, lng: number) => void
   onMarkerClick?: (index: number) => void
+  onMapReady?: (map: google.maps.Map) => void
+  onCenterChanged?: (center: { lat: number; lng: number }) => void
   className?: string
   interactive?: boolean
   showCurrentLocation?: boolean
@@ -66,6 +68,15 @@ const MARKER_ICONS: Record<string, { url: string; scaledSize: { width: number; h
     `),
     scaledSize: { width: 32, height: 32 },
   },
+  custom: {
+    url: 'data:image/svg+xml;base64,' + btoa(`
+      <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="10" fill="#6366f1"/>
+        <circle cx="12" cy="12" r="4" fill="white"/>
+      </svg>
+    `),
+    scaledSize: { width: 32, height: 32 },
+  },
 }
 
 export function MapView({
@@ -78,13 +89,15 @@ export function MapView({
   destination,
   onMapClick,
   onMarkerClick,
+  onMapReady,
+  onCenterChanged,
   className = 'w-full h-64',
   interactive = true,
   showCurrentLocation = false,
 }: MapViewProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const [map, setMap] = useState<google.maps.Map | null>(null)
-  const [mapMarkers, setMapMarkers] = useState<google.maps.Marker[]>([])
+  const mapMarkersRef = useRef<google.maps.Marker[]>([])
   const [routeRenderer, setRouteRenderer] = useState<google.maps.DirectionsRenderer | null>(null)
   const [polylineOverlay, setPolylineOverlay] = useState<google.maps.Polyline | null>(null)
   const [isLoaded, setIsLoaded] = useState(false)
@@ -108,17 +121,20 @@ export function MapView({
     loader
       .load()
       .then(() => {
+        console.log('Google Maps API loaded successfully')
         setIsLoaded(true)
       })
       .catch((err) => {
         console.error('Failed to load Google Maps:', err)
-        setError('Failed to load Google Maps')
+        setError(`Failed to load Google Maps: ${err.message || err}`)
       })
   }, [])
 
   // Create map instance
   useEffect(() => {
     if (!isLoaded || !mapRef.current || map) return
+
+    console.log('Creating map instance with center:', center, 'container size:', mapRef.current.offsetWidth, 'x', mapRef.current.offsetHeight)
 
     const mapInstance = new google.maps.Map(mapRef.current, {
       center,
@@ -134,6 +150,8 @@ export function MapView({
       ],
     })
 
+    console.log('Map instance created:', mapInstance)
+
     // Click handler
     if (onMapClick) {
       mapInstance.addListener('click', (e: google.maps.MapMouseEvent) => {
@@ -143,7 +161,36 @@ export function MapView({
       })
     }
 
+    // Center changed handler (for dragging the map)
+    // Only call onCenterChanged when user drags the map, not on every idle
+    if (onCenterChanged) {
+      let lastCenter = { lat: center.lat, lng: center.lng }
+      mapInstance.addListener('dragend', () => {
+        const newCenter = mapInstance.getCenter()
+        if (newCenter) {
+          const newLat = newCenter.lat()
+          const newLng = newCenter.lng()
+          // Only update if center actually changed significantly
+          if (Math.abs(newLat - lastCenter.lat) > 0.0001 || Math.abs(newLng - lastCenter.lng) > 0.0001) {
+            lastCenter = { lat: newLat, lng: newLng }
+            onCenterChanged({ lat: newLat, lng: newLng })
+          }
+        }
+      })
+    }
+
     setMap(mapInstance)
+
+    // Trigger resize after map is created to ensure tiles load
+    setTimeout(() => {
+      google.maps.event.trigger(mapInstance, 'resize')
+      mapInstance.setCenter(center)
+    }, 100)
+
+    // Notify when map is ready
+    if (onMapReady) {
+      onMapReady(mapInstance)
+    }
 
     // Show current location
     if (showCurrentLocation && navigator.geolocation) {
@@ -174,21 +221,29 @@ export function MapView({
         }
       )
     }
-  }, [isLoaded, center, zoom, interactive, onMapClick, showCurrentLocation])
+  }, [isLoaded])
 
-  // Update center when prop changes
+  // Update center when prop changes - use lat/lng values, not object reference
   useEffect(() => {
     if (map && center) {
-      map.setCenter(center)
+      const currentCenter = map.getCenter()
+      if (currentCenter) {
+        const currentLat = currentCenter.lat()
+        const currentLng = currentCenter.lng()
+        // Only update if significantly different to avoid loops
+        if (Math.abs(currentLat - center.lat) > 0.0001 || Math.abs(currentLng - center.lng) > 0.0001) {
+          map.setCenter(center)
+        }
+      }
     }
-  }, [map, center])
+  }, [map, center.lat, center.lng])
 
   // Handle markers
   useEffect(() => {
     if (!map) return
 
     // Clear existing markers
-    mapMarkers.forEach((marker) => marker.setMap(null))
+    mapMarkersRef.current.forEach((marker: google.maps.Marker) => marker.setMap(null))
 
     // Create new markers
     const newMarkers = markers.map((config, index) => {
@@ -219,7 +274,7 @@ export function MapView({
       return marker
     })
 
-    setMapMarkers(newMarkers)
+    mapMarkersRef.current = newMarkers
 
     // Fit bounds to show all markers
     if (newMarkers.length > 1) {
@@ -327,7 +382,7 @@ export function MapView({
     )
   }
 
-  return <div ref={mapRef} className={className} />
+  return <div ref={mapRef} className={className} style={{ minHeight: '400px' }} />
 }
 
 export default MapView

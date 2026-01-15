@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { Phone, ArrowRight, AlertCircle } from 'lucide-react'
 import { Button, Card, PhoneInput } from '@/components/ui'
 import { useAuth } from '@/hooks'
+import { APP_CONFIG } from '@/config/app'
 
 interface LocationState {
   from?: {
@@ -28,9 +29,18 @@ export default function Login() {
   // Get the return path from location state or default to home
   const from = (location.state as LocationState)?.from?.pathname || '/'
 
+  // Skip auth - redirect to home immediately
+  useEffect(() => {
+    if (APP_CONFIG.SKIP_AUTH) {
+      navigate('/', { replace: true })
+    }
+  }, [navigate])
+
   // Initialize recaptcha on mount
   useEffect(() => {
-    initializeRecaptcha('recaptcha-container')
+    if (!APP_CONFIG.SKIP_AUTH) {
+      initializeRecaptcha('recaptcha-container')
+    }
   }, [initializeRecaptcha])
 
   // Redirect if already authenticated - go back to original page
@@ -79,7 +89,7 @@ export default function Login() {
 
           {/* Welcome Text */}
           <div className="mb-8 text-center">
-            <h1 className="text-2xl font-bold text-gray-900">Welcome to GOGO</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Welcome to GOGO Express</h1>
             <p className="mt-2 text-gray-500">
               Your all-in-one app for rides, food, and grocery delivery
             </p>
@@ -87,7 +97,7 @@ export default function Login() {
 
           {/* Error Message */}
           {error && (
-            <div className="mb-4 flex items-center gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-600">
+            <div className="mb-4 flex items-center gap-2 rounded-lg bg-error-light p-3 text-sm text-error">
               <AlertCircle className="h-5 w-5 flex-shrink-0" />
               <span>{error}</span>
             </div>

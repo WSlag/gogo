@@ -68,16 +68,22 @@ export function useRealtimeRide(rideId: string | undefined): UseRealtimeRideRetu
         }
 
         // Load driver info when assigned
-        if (rideData.driverId && !driver) {
+        if (rideData.driverId) {
+          console.log('[useRealtimeRide] Loading driver:', rideData.driverId)
           try {
             const driverData = await getDocument<Driver>(collections.drivers, rideData.driverId)
+            console.log('[useRealtimeRide] Driver data:', driverData)
             if (driverData) {
               setDriverState(driverData)
               setDriver(driverData)
+            } else {
+              console.warn('[useRealtimeRide] Driver not found in Firestore:', rideData.driverId)
             }
           } catch (err) {
             console.error('Failed to load driver:', err)
           }
+        } else {
+          console.log('[useRealtimeRide] No driverId on ride')
         }
 
         // Handle ride completion/cancellation
@@ -135,7 +141,7 @@ export function useRealtimeRide(rideId: string | undefined): UseRealtimeRideRetu
 
   return {
     ride,
-    driver: driver || driverState,
+    driver,
     status: ride?.status || null,
     estimatedArrival,
     driverLocation,

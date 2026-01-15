@@ -127,7 +127,7 @@ export function CenterPin({
         className
       )}
     >
-      <LocationPin type={type} size="lg" animated />
+      <LocationPin type={type} size="lg" />
       {/* Shadow on ground */}
       <div className="absolute left-1/2 bottom-0 -translate-x-1/2 translate-y-1 w-4 h-1 bg-black/20 rounded-full blur-sm" />
     </div>

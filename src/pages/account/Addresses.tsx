@@ -207,7 +207,7 @@ export default function Addresses() {
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-white px-4 py-3 shadow-sm">
+      <div className="sticky top-0 z-30 lg:top-16 bg-white px-4 py-3 shadow-sm">
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate(-1)}
@@ -306,7 +306,7 @@ export default function Addresses() {
       </div>
 
       {/* Add Button */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 pb-safe">
+      <div className="fixed bottom-16 left-0 right-0 lg:bottom-0 lg:left-[240px] bg-white border-t p-4 pb-safe z-50">
         <Button
           fullWidth
           size="lg"

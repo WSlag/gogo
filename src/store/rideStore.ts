@@ -24,6 +24,10 @@ interface RideState {
   fare: RideFare | null
   paymentMethod: 'cash' | 'gcash' | 'wallet'
 
+  // Scheduled ride
+  isScheduled: boolean
+  scheduledTime: Date | null
+
   // Promo and surge
   promoCode: PromoCodeInfo | null
   surgeMultiplier: number
@@ -45,6 +49,7 @@ interface RideState {
   setRoute: (route: RouteInfo | null) => void
   setFare: (fare: RideFare | null) => void
   setPaymentMethod: (method: 'cash' | 'gcash' | 'wallet') => void
+  setScheduledRide: (isScheduled: boolean, scheduledTime: Date | null) => void
   setPromoCode: (promo: PromoCodeInfo | null) => void
   setSurgeMultiplier: (multiplier: number) => void
   setActiveRide: (rideId: string | null, status: RideStatus | null) => void
@@ -63,6 +68,8 @@ const initialState = {
   route: null,
   fare: null,
   paymentMethod: 'cash' as const,
+  isScheduled: false,
+  scheduledTime: null as Date | null,
   promoCode: null as PromoCodeInfo | null,
   surgeMultiplier: 1,
   activeRideId: null,
@@ -88,6 +95,8 @@ export const useRideStore = create<RideState>((set) => ({
 
   setPaymentMethod: (paymentMethod) => set({ paymentMethod }),
 
+  setScheduledRide: (isScheduled, scheduledTime) => set({ isScheduled, scheduledTime }),
+
   setPromoCode: (promoCode) => set({ promoCode }),
 
   setSurgeMultiplier: (surgeMultiplier) => set({ surgeMultiplier }),
@@ -111,6 +120,8 @@ export const useRideStore = create<RideState>((set) => ({
       route: null,
       fare: null,
       paymentMethod: 'cash',
+      isScheduled: false,
+      scheduledTime: null,
       promoCode: null,
       surgeMultiplier: 1,
       isBooking: false,

@@ -7,7 +7,6 @@ import {
   Car,
   Clock,
   Star,
-  DollarSign,
   Calendar,
   Target,
   Award,
@@ -15,6 +14,7 @@ import {
   CheckCircle,
   XCircle,
 } from 'lucide-react'
+import { PesoSign } from '@/components/icons'
 import { Card } from '@/components/ui'
 import { useAuthStore } from '@/store/authStore'
 import { collection, query, where, getDocs, orderBy, Timestamp } from 'firebase/firestore'
@@ -230,7 +230,7 @@ export default function DriverStats() {
 
           <Card className="!p-4">
             <div className="flex items-center gap-2 mb-2">
-              <DollarSign className="h-5 w-5 text-green-500" />
+              <PesoSign className="h-5 w-5 text-green-500" />
               <span className="text-sm text-gray-500">Earnings</span>
             </div>
             <p className="text-3xl font-bold text-gray-900">₱{currentStats.earnings.toLocaleString()}</p>

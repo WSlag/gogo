@@ -9,6 +9,7 @@ import {
   RefreshCw,
   Star,
   Clock,
+  Pill,
 } from 'lucide-react'
 import { Card, Spinner, Button } from '@/components/ui'
 import { useOrders } from '@/hooks'
@@ -17,9 +18,10 @@ import type { Order, OrderStatus } from '@/types'
 
 type OrderFilter = 'all' | 'active' | 'completed'
 
-const orderIcons = {
+const orderIcons: Record<string, typeof UtensilsCrossed> = {
   food: UtensilsCrossed,
   grocery: ShoppingCart,
+  pharmacy: Pill,
   ride: Car,
 }
 
@@ -157,22 +159,28 @@ export default function OrderList() {
                         className={cn(
                           'flex h-11 w-11 items-center justify-center rounded-xl',
                           order.type === 'food' && 'bg-orange-50',
-                          order.type === 'grocery' && 'bg-green-50'
+                          order.type === 'grocery' && 'bg-green-50',
+                          order.type === 'pharmacy' && 'bg-red-50'
                         )}
                       >
-                        <Icon
-                          className={cn(
-                            'h-5 w-5',
-                            order.type === 'food' && 'text-orange-600',
-                            order.type === 'grocery' && 'text-green-600'
-                          )}
-                        />
+                        {Icon ? (
+                          <Icon
+                            className={cn(
+                              'h-5 w-5',
+                              order.type === 'food' && 'text-orange-600',
+                              order.type === 'grocery' && 'text-green-600',
+                              order.type === 'pharmacy' && 'text-red-600'
+                            )}
+                          />
+                        ) : (
+                          <Package className="h-5 w-5 text-gray-600" />
+                        )}
                       </div>
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
                           <h3 className="font-semibold text-gray-900 truncate">
-                            {order.merchantId}
+                            {order.merchantName || order.merchantId}
                           </h3>
                           <ChevronRight className="h-5 w-5 text-gray-400 flex-shrink-0" />
                         </div>

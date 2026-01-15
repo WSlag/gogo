@@ -15,6 +15,7 @@ import {
   GeoPoint,
 } from '@/services/firebase/firestore'
 import type { Order, OrderStatus, OrderItem, Merchant } from '@/types'
+import { APP_CONFIG } from '@/config/app'
 
 interface DeliveryAddress {
   address: string
@@ -55,10 +56,14 @@ export function useOrders(): UseOrdersReturn {
     deliveryAddress: DeliveryAddress,
     notes?: string
   ): Promise<string | null> => {
-    if (!user || !profile) {
+    // Skip auth check in testing mode
+    if (!APP_CONFIG.SKIP_AUTH && !profile) {
       setError('Please login to place an order')
       return null
     }
+
+    // Use profile.id, user.uid, or test user ID as the customer ID
+    const customerId = user?.uid || profile?.id || APP_CONFIG.TEST_USER_ID
 
     if (!cart || cart.items.length === 0) {
       setError('Your cart is empty')
@@ -77,40 +82,57 @@ export function useOrders(): UseOrdersReturn {
       const serviceFee = Math.round(subtotal * 0.05) // 5% service fee
       const total = subtotal + cart.deliveryFee + serviceFee
 
-      // Create order items
-      const orderItems: OrderItem[] = cart.items.map((item) => ({
-        productId: item.productId,
-        name: item.name,
-        quantity: item.quantity,
-        price: item.price,
-        options: item.options,
-        addons: item.addons,
-        specialInstructions: item.specialInstructions,
-        total: item.price * item.quantity,
-      }))
+      // Create order items (filter out undefined values for Firestore)
+      const orderItems: OrderItem[] = cart.items.map((item) => {
+        const orderItem: OrderItem = {
+          productId: item.productId,
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+          total: item.price * item.quantity,
+        }
+        // Only add optional fields if they have values
+        if (item.options) orderItem.options = item.options
+        if (item.addons) orderItem.addons = item.addons
+        if (item.specialInstructions) orderItem.specialInstructions = item.specialInstructions
+        return orderItem
+      })
 
-      // Create order document
-      const orderData: Partial<Order> = {
+      // Build delivery address object (exclude undefined values for Firestore)
+      const deliveryAddressData: Record<string, any> = {
+        address: deliveryAddress.address,
+        coordinates: new GeoPoint(deliveryAddress.coordinates.lat, deliveryAddress.coordinates.lng),
+        contactName: deliveryAddress.contactName || (profile ? `${profile.firstName} ${profile.lastName}` : 'Test User'),
+        contactPhone: deliveryAddress.contactPhone || profile?.phone || '',
+      }
+      if (deliveryAddress.details) {
+        deliveryAddressData.details = deliveryAddress.details
+      }
+
+      // Create order document (exclude undefined values for Firestore)
+      const orderData: Record<string, any> = {
         id: orderId,
-        customerId: user.uid,
+        customerId,
         merchantId: cart.merchantId,
-        type: cart.merchantType === 'grocery' ? 'grocery' : 'food',
+        merchantName: cart.merchantName,
+        type: cart.merchantType === 'grocery'
+          ? 'grocery'
+          : cart.merchantType === 'pharmacy'
+            ? 'pharmacy'
+            : 'food',
         items: orderItems,
         subtotal,
         deliveryFee: cart.deliveryFee,
         serviceFee,
         total,
-        deliveryAddress: {
-          address: deliveryAddress.address,
-          coordinates: new GeoPoint(deliveryAddress.coordinates.lat, deliveryAddress.coordinates.lng),
-          details: deliveryAddress.details,
-          contactName: deliveryAddress.contactName || `${profile.firstName} ${profile.lastName}`,
-          contactPhone: deliveryAddress.contactPhone || profile.phone,
-        },
+        deliveryAddress: deliveryAddressData,
         paymentMethod: 'cash', // Default to cash, can be changed
         paymentStatus: 'pending',
         status: 'pending',
-        notes,
+      }
+      // Only add notes if provided
+      if (notes) {
+        orderData.notes = notes
       }
 
       await setDocument(collections.orders, orderId, {
@@ -151,13 +173,15 @@ export function useOrders(): UseOrdersReturn {
     status?: OrderStatus,
     limitCount: number = 20
   ): Promise<Order[]> => {
-    if (!user) return []
+    // Use user.uid, profile.id, or test user ID
+    const customerId = user?.uid || profile?.id || (APP_CONFIG.SKIP_AUTH ? APP_CONFIG.TEST_USER_ID : null)
+    if (!customerId) return []
 
     try {
       setIsLoading(true)
 
       const constraints = [
-        where('customerId', '==', user.uid),
+        where('customerId', '==', customerId),
         orderBy('createdAt', 'desc'),
         limit(limitCount),
       ]
@@ -176,7 +200,7 @@ export function useOrders(): UseOrdersReturn {
       setIsLoading(false)
       return []
     }
-  }, [user])
+  }, [user, profile])
 
   const cancelOrder = useCallback(async (orderId: string, reason?: string): Promise<boolean> => {
     try {
@@ -278,12 +302,14 @@ export function useOrders(): UseOrdersReturn {
   }, [])
 
   const subscribeToActiveOrders = useCallback(() => {
-    if (!user) return () => {}
+    // Use user.uid, profile.id, or test user ID
+    const customerId = user?.uid || profile?.id || (APP_CONFIG.SKIP_AUTH ? APP_CONFIG.TEST_USER_ID : null)
+    if (!customerId) return () => {}
 
     const unsub = subscribeToCollection<Order>(
       collections.orders,
       [
-        where('customerId', '==', user.uid),
+        where('customerId', '==', customerId),
         where('status', 'in', ['pending', 'confirmed', 'preparing', 'ready', 'picked_up', 'on_the_way']),
         orderBy('createdAt', 'desc'),
       ],
@@ -292,7 +318,7 @@ export function useOrders(): UseOrdersReturn {
       }
     )
     return unsub
-  }, [user])
+  }, [user, profile])
 
   return {
     orders,

@@ -84,8 +84,10 @@ export default function Checkout() {
     return `${dateLabel} at ${date.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' })}`
   }
 
-  // Set default address on load
+  // Set default address on load or open address modal if no addresses
   useEffect(() => {
+    if (isLoadingAddresses) return
+
     if (addresses.length > 0 && !deliveryAddress.address) {
       const defaultAddr = addresses[0]
       const coords = defaultAddr.coordinates as any
@@ -97,8 +99,11 @@ export default function Checkout() {
         contactPhone: profile?.phone || '',
         coordinates: coords ? { lat: coords.latitude, lng: coords.longitude } : { lat: 7.2047, lng: 124.2530 },
       })
+    } else if (addresses.length === 0 && !deliveryAddress.address) {
+      // Auto-open address modal if user has no saved addresses
+      setShowAddressModal(true)
     }
-  }, [addresses, profile])
+  }, [addresses, profile, isLoadingAddresses])
 
   const handleSelectSavedAddress = (addr: SavedLocation) => {
     const coords = addr.coordinates as any
@@ -124,44 +129,14 @@ export default function Checkout() {
     }
   }
 
-  if (!cart || cart.items.length === 0) {
-    navigate('/cart')
-    return null
-  }
-
-  const subtotal = cart.items.reduce((sum, item) => sum + item.price * item.quantity, 0)
-  const serviceFee = Math.round(subtotal * 0.05)
-  const total = subtotal + cart.deliveryFee + serviceFee
-
-  const paymentMethods = [
-    { id: 'cash', label: 'Cash on Delivery', icon: Banknote, description: 'Pay when your order arrives' },
-    { id: 'gcash', label: 'GCash', icon: CreditCard, description: 'Pay via GCash' },
-    { id: 'wallet', label: 'GOGO Wallet', icon: Wallet, description: `Balance: ₱${balance.toFixed(2)}` },
-  ]
-
-  const handlePlaceOrder = async () => {
-    if (!deliveryAddress.address) {
-      setShowAddressSelector(true)
-      return
+  // Redirect to cart if empty (but not if order was just placed)
+  useEffect(() => {
+    if ((!cart || cart.items.length === 0) && !orderPlaced) {
+      navigate('/cart')
     }
+  }, [cart, navigate, orderPlaced])
 
-    const result = await placeOrder(
-      {
-        address: deliveryAddress.address,
-        coordinates: deliveryAddress.coordinates,
-        details: deliveryAddress.details,
-        contactName: deliveryAddress.contactName,
-        contactPhone: deliveryAddress.contactPhone,
-      },
-      notes
-    )
-
-    if (result) {
-      setOrderId(result)
-      setOrderPlaced(true)
-    }
-  }
-
+  // Show success screen if order was placed
   if (orderPlaced && orderId) {
     return (
       <div className="flex h-screen flex-col items-center justify-center p-6">
@@ -194,10 +169,47 @@ export default function Checkout() {
     )
   }
 
+  if (!cart || cart.items.length === 0) {
+    return null
+  }
+
+  const subtotal = cart.items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  const serviceFee = Math.round(subtotal * 0.05)
+  const total = subtotal + cart.deliveryFee + serviceFee
+
+  const paymentMethods = [
+    { id: 'cash', label: 'Cash on Delivery', icon: Banknote, description: 'Pay when your order arrives' },
+    { id: 'gcash', label: 'GCash', icon: CreditCard, description: 'Pay via GCash' },
+    { id: 'wallet', label: 'GOGO Express Wallet', icon: Wallet, description: `Balance: ₱${balance.toFixed(2)}` },
+  ]
+
+  const handlePlaceOrder = async () => {
+    if (!deliveryAddress.address) {
+      setShowAddressSelector(true)
+      return
+    }
+
+    const result = await placeOrder(
+      {
+        address: deliveryAddress.address,
+        coordinates: deliveryAddress.coordinates,
+        details: deliveryAddress.details,
+        contactName: deliveryAddress.contactName,
+        contactPhone: deliveryAddress.contactPhone,
+      },
+      notes
+    )
+
+    if (result) {
+      setOrderId(result)
+      setOrderPlaced(true)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 pb-32">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-white px-4 py-3 shadow-sm">
+      <div className="sticky top-0 z-30 lg:top-16 bg-white px-4 py-3 shadow-sm">
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate(-1)}
@@ -394,7 +406,7 @@ export default function Checkout() {
       </div>
 
       {/* Bottom CTA */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 pb-safe">
+      <div className="fixed bottom-16 left-0 right-0 lg:bottom-0 lg:left-[240px] bg-white border-t p-4 pb-safe z-50">
         <div className="max-w-lg mx-auto">
           <div className="flex items-center justify-between mb-3">
             <span className="text-gray-500">Total Payment</span>
@@ -469,10 +481,13 @@ export default function Checkout() {
           </div>
           <Button
             fullWidth
-            onClick={() => setShowAddressModal(false)}
+            onClick={() => {
+              setSelectedSavedAddress(null)
+              setShowAddressModal(false)
+            }}
             disabled={!deliveryAddress.address}
           >
-            Save Address
+            Use This Address
           </Button>
         </div>
       </Modal>

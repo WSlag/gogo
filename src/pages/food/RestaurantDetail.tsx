@@ -36,7 +36,7 @@ export default function RestaurantDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { merchant, products, categories, isLoading, error } = useMerchantDetail(id || '')
-  const { cart, addItem, updateQuantity } = useCartStore()
+  const { cart, addItem, updateQuantity, itemCount } = useCartStore()
 
   const [selectedCategory, setSelectedCategory] = useState<string>('All')
   const [searchQuery, setSearchQuery] = useState('')
@@ -87,9 +87,13 @@ export default function RestaurantDetail() {
         image: product.image,
         total: product.salePrice || product.price,
       },
-      merchant.id,
-      merchant.name,
-      merchant.type
+      {
+        merchantId: merchant.id,
+        merchantName: merchant.name,
+        merchantType: merchant.type,
+        deliveryFee: merchant.deliveryFee,
+        minOrder: merchant.minOrder,
+      }
     )
   }
 
@@ -210,9 +214,13 @@ export default function RestaurantDetail() {
         specialInstructions: specialInstructions || undefined,
         total: itemPrice * quantity,
       },
-      merchant.id,
-      merchant.name,
-      merchant.type
+      {
+        merchantId: merchant.id,
+        merchantName: merchant.name,
+        merchantType: merchant.type,
+        deliveryFee: merchant.deliveryFee,
+        minOrder: merchant.minOrder,
+      }
     )
 
     setSelectedProduct(null)
@@ -237,8 +245,7 @@ export default function RestaurantDetail() {
     )
   }
 
-  const cartItemCount = cart?.items.reduce((sum, item) => sum + item.quantity, 0) || 0
-  const cartTotal = cart?.items.reduce((sum, item) => sum + item.price * item.quantity, 0) || 0
+  const cartTotal = cart?.subtotal || 0
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
@@ -309,13 +316,15 @@ export default function RestaurantDetail() {
         </div>
 
         {/* Tags */}
-        <div className="mt-3 flex flex-wrap gap-2">
-          {merchant.categories.map((category) => (
-            <Badge key={category} variant="secondary" size="sm">
-              {category}
-            </Badge>
-          ))}
-        </div>
+        {merchant.categories && merchant.categories.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {merchant.categories.map((category) => (
+              <Badge key={category} variant="secondary" size="sm">
+                {category}
+              </Badge>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Search Bar */}
@@ -333,7 +342,7 @@ export default function RestaurantDetail() {
       </div>
 
       {/* Category Pills */}
-      <div className="sticky top-0 z-10 bg-white border-b">
+      <div className="sticky top-0 z-30 lg:top-16 bg-white border-b">
         <div className="overflow-x-auto scrollbar-hide">
           <div className="flex gap-2 px-4 py-3">
             <button
@@ -461,8 +470,8 @@ export default function RestaurantDetail() {
       </div>
 
       {/* Cart Footer */}
-      {cartItemCount > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 pb-safe">
+      {itemCount > 0 && (
+        <div className="fixed bottom-16 left-0 right-0 lg:bottom-0 lg:left-[240px] bg-white border-t p-4 pb-safe z-50">
           <Button
             fullWidth
             size="lg"
@@ -471,7 +480,7 @@ export default function RestaurantDetail() {
           >
             <div className="flex items-center gap-2">
               <ShoppingBag className="h-5 w-5" />
-              <span>{cartItemCount} items</span>
+              <span>{itemCount} items</span>
             </div>
             <span>₱{cartTotal.toFixed(2)}</span>
           </Button>

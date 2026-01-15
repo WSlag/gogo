@@ -50,7 +50,7 @@ function generateReceipt(order: Order): string {
 
   const lines = [
     '═══════════════════════════════════════',
-    '              GOGO RECEIPT              ',
+    '           GOGO EXPRESS RECEIPT          ',
     '═══════════════════════════════════════',
     '',
     `Order ID: ${order.id}`,
@@ -105,7 +105,7 @@ function generateReceipt(order: Order): string {
   lines.push(`Payment Status: ${order.paymentStatus.toUpperCase()}`)
   lines.push('')
   lines.push('═══════════════════════════════════════')
-  lines.push('       Thank you for using GOGO!       ')
+  lines.push('    Thank you for using GOGO Express!   ')
   lines.push('═══════════════════════════════════════')
 
   return lines.join('\n')
@@ -186,7 +186,7 @@ export default function OrderDetail() {
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-white px-4 py-3 shadow-sm">
+      <div className="sticky top-0 z-30 lg:top-16 bg-white px-4 py-3 shadow-sm">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
@@ -227,7 +227,7 @@ export default function OrderDetail() {
                   ? 'Order has been delivered'
                   : order.status === 'cancelled'
                   ? order.cancellationReason || 'Order was cancelled'
-                  : `Estimated delivery: ${order.type === 'food' ? '30-45 min' : '45-60 min'}`}
+                  : `Estimated delivery: ${order.type === 'food' ? '30-45 min' : order.type === 'pharmacy' ? '20-30 min' : '45-60 min'}`}
               </p>
             </div>
           </div>
@@ -407,7 +407,7 @@ export default function OrderDetail() {
 
       {/* Bottom Actions */}
       {canRate && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 pb-safe">
+        <div className="fixed bottom-16 left-0 right-0 lg:bottom-0 lg:left-[240px] bg-white border-t p-4 pb-safe z-50">
           <Button
             fullWidth
             size="lg"

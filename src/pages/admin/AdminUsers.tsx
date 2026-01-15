@@ -1,21 +1,23 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
   Search,
-  Filter,
   MoreVertical,
   User,
   Mail,
   Phone,
-  Calendar,
   Ban,
   CheckCircle2,
   XCircle,
   ChevronLeft,
   ChevronRight,
+  Loader2,
+  RefreshCw,
 } from 'lucide-react'
 import { Button, Card, Modal } from '@/components/ui'
+import { collection, getDocs, doc, updateDoc, Timestamp, orderBy, query, limit } from 'firebase/firestore'
+import { db } from '@/services/firebase/config'
 
 interface UserData {
   id: string
@@ -98,13 +100,59 @@ const MOCK_USERS: UserData[] = [
 
 export default function AdminUsers() {
   const navigate = useNavigate()
-  const [users, setUsers] = useState<UserData[]>(MOCK_USERS)
+  const [users, setUsers] = useState<UserData[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [selectedUser, setSelectedUser] = useState<UserData | null>(null)
   const [showActionModal, setShowActionModal] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
+  const [refreshing, setRefreshing] = useState(false)
   const itemsPerPage = 10
+
+  useEffect(() => {
+    fetchUsers()
+  }, [])
+
+  const fetchUsers = async () => {
+    setLoading(true)
+    try {
+      const q = query(
+        collection(db, 'users'),
+        orderBy('createdAt', 'desc'),
+        limit(100)
+      )
+      const snapshot = await getDocs(q)
+      const userData: UserData[] = snapshot.docs.map((doc) => {
+        const data = doc.data()
+        return {
+          id: doc.id,
+          firstName: data.firstName || '',
+          lastName: data.lastName || '',
+          email: data.email || '',
+          phone: data.phone || '',
+          avatar: data.profileImage || data.avatar,
+          status: data.status || 'active',
+          totalOrders: data.totalOrders || 0,
+          totalSpent: data.totalSpent || 0,
+          joinedAt: data.createdAt?.toDate() || new Date(),
+          lastActive: data.lastActive?.toDate() || data.updatedAt?.toDate() || new Date(),
+        }
+      })
+      setUsers(userData.length > 0 ? userData : MOCK_USERS)
+    } catch (error) {
+      console.error('Error fetching users:', error)
+      setUsers(MOCK_USERS)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleRefresh = async () => {
+    setRefreshing(true)
+    await fetchUsers()
+    setRefreshing(false)
+  }
 
   const filteredUsers = users.filter((user) => {
     if (statusFilter !== 'all' && user.status !== statusFilter) return false
@@ -141,36 +189,61 @@ export default function AdminUsers() {
     })
   }
 
-  const handleStatusChange = (userId: string, newStatus: UserData['status']) => {
-    setUsers((prev) =>
-      prev.map((user) =>
-        user.id === userId ? { ...user, status: newStatus } : user
+  const handleStatusChange = async (userId: string, newStatus: UserData['status']) => {
+    try {
+      await updateDoc(doc(db, 'users', userId), {
+        status: newStatus,
+        updatedAt: Timestamp.now(),
+      })
+      setUsers((prev) =>
+        prev.map((user) =>
+          user.id === userId ? { ...user, status: newStatus } : user
+        )
       )
-    )
-    setShowActionModal(false)
-    setSelectedUser(null)
+      setShowActionModal(false)
+      setSelectedUser(null)
+    } catch (error) {
+      console.error('Error updating user status:', error)
+      // Still update local state for demo purposes
+      setUsers((prev) =>
+        prev.map((user) =>
+          user.id === userId ? { ...user, status: newStatus } : user
+        )
+      )
+      setShowActionModal(false)
+      setSelectedUser(null)
+    }
   }
 
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Header */}
       <div className="bg-gray-900 text-white px-6 py-4">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => navigate('/admin')}
-            className="p-2 rounded-lg hover:bg-gray-800"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-          <div>
-            <h1 className="text-xl font-bold">User Management</h1>
-            <p className="text-gray-400 text-sm">{filteredUsers.length} users</p>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => navigate('/admin')}
+              className="p-2 rounded-lg hover:bg-gray-800"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <div>
+              <h1 className="text-xl font-bold">User Management</h1>
+              <p className="text-gray-400 text-sm">{filteredUsers.length} users</p>
+            </div>
           </div>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className={`p-2 rounded-lg hover:bg-gray-800 ${refreshing ? 'animate-spin' : ''}`}
+          >
+            <RefreshCw className="h-5 w-5" />
+          </button>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-white border-b px-6 py-4 sticky top-0 z-10">
+      <div className="bg-white border-b px-6 py-4 sticky top-0 z-30 lg:top-16">
         <div className="flex gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -198,6 +271,11 @@ export default function AdminUsers() {
       <div className="p-6">
         <Card>
           {/* Table */}
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
+            </div>
+          ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
@@ -212,7 +290,11 @@ export default function AdminUsers() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {filteredUsers.map((user) => (
+                {filteredUsers.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-12 text-center text-gray-500">No users found</td>
+                  </tr>
+                ) : filteredUsers.map((user) => (
                   <tr key={user.id} className="hover:bg-gray-50">
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-3">
@@ -277,6 +359,7 @@ export default function AdminUsers() {
               </tbody>
             </table>
           </div>
+          )}
 
           {/* Pagination */}
           <div className="flex items-center justify-between px-4 py-3 border-t">

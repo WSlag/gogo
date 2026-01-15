@@ -192,7 +192,7 @@ export default function Settings() {
   return (
     <div className="min-h-screen bg-gray-50 pb-8">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-white px-4 py-3 shadow-sm">
+      <div className="sticky top-0 z-30 lg:top-16 bg-white px-4 py-3 shadow-sm">
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate(-1)}
@@ -296,7 +296,7 @@ export default function Settings() {
 
         {/* App Version */}
         <p className="text-center text-sm text-gray-400">
-          GOGO App v1.0.0
+          GOGO Express App v1.0.0
         </p>
       </div>
 

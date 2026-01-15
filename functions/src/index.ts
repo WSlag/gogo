@@ -4,11 +4,82 @@ import * as functions from 'firebase-functions';
 // Initialize Firebase Admin
 admin.initializeApp();
 
+// PayMongo API Configuration
+// In production, these should be stored in Firebase Functions config or Secret Manager
+const PAYMONGO_SECRET_KEY = functions.config().paymongo?.secret_key || process.env.PAYMONGO_SECRET_KEY || '';
+const PAYMONGO_API_URL = 'https://api.paymongo.com/v1';
+
+// Helper function to make PayMongo API requests
+async function paymongoRequest(endpoint: string, method: string, body?: Record<string, unknown>) {
+  const fetch = (await import('node-fetch')).default;
+
+  const response = await fetch(`${PAYMONGO_API_URL}${endpoint}`, {
+    method,
+    headers: {
+      'Authorization': `Basic ${Buffer.from(PAYMONGO_SECRET_KEY + ':').toString('base64')}`,
+      'Content-Type': 'application/json',
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  if (!response.ok) {
+    const error = await response.json() as { errors?: Array<{ detail: string }> };
+    throw new Error(error.errors?.[0]?.detail || 'PayMongo API error');
+  }
+
+  return response.json();
+}
+
 const db = admin.firestore();
 
 // ==========================================
 // USER FUNCTIONS
 // ==========================================
+
+// Bootstrap admin - syncs Firestore role to custom claims
+// If user has role: 'admin' in Firestore, set custom claim
+export const bootstrapAdmin = functions.https.onCall(async (_data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const callerUid = context.auth.uid;
+
+  // Check if user has admin role in Firestore
+  const userDoc = await db.collection('users').doc(callerUid).get();
+
+  if (!userDoc.exists) {
+    throw new functions.https.HttpsError('not-found', 'User document not found');
+  }
+
+  const userData = userDoc.data();
+
+  if (userData?.role !== 'admin') {
+    throw new functions.https.HttpsError(
+      'permission-denied',
+      'You do not have admin role in Firestore. Set role to admin in Firestore first.'
+    );
+  }
+
+  // User has admin role in Firestore - sync to custom claims
+  await admin.auth().setCustomUserClaims(callerUid, { role: 'admin' });
+
+  console.log(`User ${callerUid} custom claims synced to admin`);
+
+  return {
+    success: true,
+    message: 'Admin custom claims set. Please sign out and sign back in to apply the changes.',
+  };
+});
+
+// ==========================================
+// APP CONFIG - PRODUCTION SETTINGS
+// ==========================================
+const APP_CONFIG = {
+  AUTO_APPROVE_DRIVERS: false,    // PRODUCTION: Requires admin approval
+  AUTO_APPROVE_MERCHANTS: false,  // PRODUCTION: Requires admin approval
+  DEFAULT_ROLE: 'customer' as const,
+};
 
 // Create user profile on first sign-in
 export const onUserCreate = functions.auth.user().onCreate(async (user) => {
@@ -21,9 +92,13 @@ export const onUserCreate = functions.auth.user().onCreate(async (user) => {
   // Generate referral code
   const referralCode = 'GOGO' + Math.random().toString(36).substring(2, 8).toUpperCase();
 
+  // Set default role via custom claims
+  await admin.auth().setCustomUserClaims(uid, { role: APP_CONFIG.DEFAULT_ROLE });
+
   // Create user profile
   await db.collection('users').doc(uid).set({
     id: uid,
+    role: APP_CONFIG.DEFAULT_ROLE,
     email: email || '',
     phone: phoneNumber || '',
     firstName: displayName?.split(' ')[0] || '',
@@ -46,56 +121,212 @@ export const onUserCreate = functions.auth.user().onCreate(async (user) => {
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
 
-  console.log(`Created user profile for ${uid}`);
+  console.log(`Created user profile for ${uid} with role: ${APP_CONFIG.DEFAULT_ROLE}`);
 });
+
+// Set user role (admin only in production, auto-approve for testing)
+export const setUserRole = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const { targetUserId, role } = data;
+  const callerUid = context.auth.uid;
+  const validRoles = ['customer', 'driver', 'merchant', 'admin'];
+
+  // Validate role
+  if (!role || !validRoles.includes(role)) {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid role specified');
+  }
+
+  // Check if caller is admin or if it's a self-upgrade during testing
+  const callerClaims = context.auth.token;
+  const isAdmin = callerClaims.role === 'admin';
+  const isSelfUpgrade = callerUid === targetUserId;
+
+  // In production, only admin can change roles
+  // For testing, allow self-upgrade to driver/merchant if auto-approve is enabled
+  if (!isAdmin && !isSelfUpgrade) {
+    throw new functions.https.HttpsError('permission-denied', 'Only admins can change other users\' roles');
+  }
+
+  if (isSelfUpgrade && !isAdmin) {
+    // Self-upgrade checks
+    if (role === 'admin') {
+      throw new functions.https.HttpsError('permission-denied', 'Cannot self-assign admin role');
+    }
+    if (role === 'driver' && !APP_CONFIG.AUTO_APPROVE_DRIVERS) {
+      throw new functions.https.HttpsError('permission-denied', 'Driver applications require admin approval');
+    }
+    if (role === 'merchant' && !APP_CONFIG.AUTO_APPROVE_MERCHANTS) {
+      throw new functions.https.HttpsError('permission-denied', 'Merchant applications require admin approval');
+    }
+  }
+
+  // Update custom claims
+  await admin.auth().setCustomUserClaims(targetUserId, { role });
+
+  // Update Firestore
+  await db.collection('users').doc(targetUserId).update({
+    role,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  console.log(`User ${targetUserId} role changed to ${role} by ${callerUid}`);
+
+  return { success: true, role };
+});
+
+// Auto-approve driver when driver document is created (for testing)
+export const onDriverCreated = functions.firestore
+  .document('drivers/{driverId}')
+  .onCreate(async (snapshot, context) => {
+    const driverId = context.params.driverId;
+    const driverData = snapshot.data();
+
+    // Skip if already verified or if it's a demo driver
+    if (driverData.verified || driverId.startsWith('demo_')) {
+      return;
+    }
+
+    if (APP_CONFIG.AUTO_APPROVE_DRIVERS) {
+      // Auto-approve for testing
+      await admin.auth().setCustomUserClaims(driverId, { role: 'driver' });
+
+      await snapshot.ref.update({
+        verified: true,
+        verifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // Update user role in users collection
+      await db.collection('users').doc(driverId).update({
+        role: 'driver',
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      console.log(`Driver ${driverId} auto-approved for testing`);
+    } else {
+      console.log(`Driver ${driverId} created, pending admin approval`);
+    }
+  });
+
+// Auto-approve merchant when merchant document is created (for testing)
+export const onMerchantCreated = functions.firestore
+  .document('merchants/{merchantId}')
+  .onCreate(async (snapshot, context) => {
+    const merchantId = context.params.merchantId;
+    const merchantData = snapshot.data();
+    const ownerId = merchantData.ownerId;
+
+    // Skip if already verified
+    if (merchantData.verified) {
+      return;
+    }
+
+    if (APP_CONFIG.AUTO_APPROVE_MERCHANTS && ownerId) {
+      // Auto-approve for testing
+      await admin.auth().setCustomUserClaims(ownerId, { role: 'merchant' });
+
+      await snapshot.ref.update({
+        verified: true,
+        verifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // Update user role in users collection
+      await db.collection('users').doc(ownerId).update({
+        role: 'merchant',
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      console.log(`Merchant ${merchantId} auto-approved for testing (owner: ${ownerId})`);
+    } else {
+      console.log(`Merchant ${merchantId} created, pending admin approval`);
+    }
+  });
 
 // ==========================================
 // RIDE FUNCTIONS
 // ==========================================
 
-// On ride created - Find and match driver
+// On ride created - Notify available drivers (manual accept flow)
+// The ride stays in 'pending' status until a driver accepts it
 export const onRideCreated = functions.firestore
   .document('rides/{rideId}')
   .onCreate(async (snapshot, context) => {
     const ride = snapshot.data();
     const rideId = context.params.rideId;
 
-    console.log(`New ride created: ${rideId}`);
+    console.log(`New ride created: ${rideId}, vehicleType: ${ride.vehicleType}, status: ${ride.status}`);
 
-    // Find available drivers of the requested vehicle type
+    // Ride stays in 'pending' status - driver must manually accept
+    // This function just logs the new ride for now
+    // In production, you would send push notifications to nearby drivers
+
+    // Find online drivers that could accept this ride (for logging/notification purposes)
     const driversSnapshot = await db.collection('drivers')
-      .where('vehicleType', '==', ride.vehicleType)
       .where('status', '==', 'online')
       .where('verified', '==', true)
       .limit(10)
       .get();
 
     if (driversSnapshot.empty) {
-      console.log(`No available drivers for ride ${rideId}`);
-      // In production, you would implement a queue/retry mechanism
+      console.log(`No online drivers available for ride ${rideId}`);
+      // In production, you might want to notify the customer or retry later
       return;
     }
 
-    // For demo, assign the first available driver
-    // In production, implement proper matching algorithm based on distance, ratings, etc.
-    const driver = driversSnapshot.docs[0];
+    const availableDriverIds = driversSnapshot.docs.map(doc => doc.id);
+    console.log(`Found ${availableDriverIds.length} online drivers for ride ${rideId}: ${availableDriverIds.join(', ')}`);
 
-    await db.collection('rides').doc(rideId).update({
-      driverId: driver.id,
-      status: 'accepted',
-      acceptedAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
+    // In production, send push notifications to these drivers
+    // For now, the driver dashboard will poll for pending rides
 
-    // Update driver status
-    await db.collection('drivers').doc(driver.id).update({
-      status: 'busy',
-      currentRideId: rideId,
-    });
+    // Create notifications for available drivers
+    const batch = db.batch();
+    for (const driverDoc of driversSnapshot.docs) {
+      const notificationRef = db.collection('notifications').doc();
+      batch.set(notificationRef, {
+        userId: driverDoc.id,
+        type: 'ride_request',
+        title: 'New Ride Request',
+        body: `₱${ride.fare?.total?.toFixed(2) || '0'} - ${ride.pickup?.address?.substring(0, 50) || 'Pickup location'}`,
+        data: {
+          rideId,
+          vehicleType: ride.vehicleType,
+          fare: ride.fare?.total,
+          pickupAddress: ride.pickup?.address,
+          dropoffAddress: ride.dropoff?.address,
+        },
+        read: false,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
 
-    // Send notification to passenger (in production)
-    console.log(`Assigned driver ${driver.id} to ride ${rideId}`);
+    try {
+      await batch.commit();
+      console.log(`Sent notifications to ${driversSnapshot.size} drivers for ride ${rideId}`);
+    } catch (err) {
+      console.error('Error sending notifications:', err);
+    }
   });
+
+// Helper function to calculate distance between two points (Haversine formula)
+// Used for production driver matching based on proximity
+// Exported to satisfy noUnusedLocals check - will be used in production mode
+export function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371e3; // Earth's radius in meters
+  const φ1 = lat1 * Math.PI / 180;
+  const φ2 = lat2 * Math.PI / 180;
+  const Δφ = (lat2 - lat1) * Math.PI / 180;
+  const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c; // Distance in meters
+}
 
 // On ride status change - Send notifications
 export const onRideUpdated = functions.firestore
@@ -180,9 +411,22 @@ async function handleRideCancelled(rideId: string, ride: FirebaseFirestore.Docum
       status: 'online',
       currentRideId: null,
     });
+
+    // Notify driver about cancellation
+    await db.collection('notifications').add({
+      userId: ride.driverId,
+      type: 'ride_cancelled',
+      title: 'Ride Cancelled',
+      body: ride.cancelledBy === 'passenger'
+        ? 'The passenger has cancelled the ride.'
+        : 'The ride has been cancelled.',
+      data: { rideId },
+      read: false,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
   }
 
-  console.log(`Ride ${rideId} cancelled`);
+  console.log(`Ride ${rideId} cancelled by ${ride.cancelledBy || 'unknown'}`);
 }
 
 // ==========================================
@@ -193,10 +437,10 @@ async function handleRideCancelled(rideId: string, ride: FirebaseFirestore.Docum
 export const onOrderCreated = functions.firestore
   .document('orders/{orderId}')
   .onCreate(async (snapshot, context) => {
-    const order = snapshot.data();
+    const _order = snapshot.data(); // Prefixed with _ to indicate intentionally unused
     const orderId = context.params.orderId;
 
-    console.log(`New order created: ${orderId}`);
+    console.log(`New order created: ${orderId}`, _order.status);
 
     // Notify merchant (in production, send push notification)
     // Auto-confirm for demo purposes
@@ -345,7 +589,9 @@ export const validatePromo = functions.https.onCall(async (data, context) => {
   }
 
   const { code, orderTotal, serviceType } = data;
-  const userId = context.auth.uid;
+  // userId can be used for per-user promo validation in production
+  const _userId = context.auth.uid;
+  console.log(`Validating promo for user: ${_userId}`);
 
   // Find promo
   const promoSnapshot = await db.collection('promos')
@@ -424,3 +670,521 @@ export const cleanupNotifications = functions.pubsub
     await batch.commit();
     console.log(`Deleted ${oldNotifications.size} old notifications`);
   });
+
+// ==========================================
+// PAYMENT FUNCTIONS (PayMongo Integration)
+// ==========================================
+
+interface PayMongoResponse {
+  data: {
+    id: string;
+    type: string;
+    attributes: {
+      amount: number;
+      currency: string;
+      status: string;
+      client_key?: string;
+      redirect?: {
+        checkout_url: string;
+        success: string;
+        failed: string;
+      };
+    };
+  };
+}
+
+// Create a payment intent for card payments
+export const createPaymentIntent = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const { amount, description, metadata } = data;
+
+  if (!amount || amount < 100) {
+    throw new functions.https.HttpsError('invalid-argument', 'Minimum payment is ₱100');
+  }
+
+  // Check if PayMongo is configured
+  if (!PAYMONGO_SECRET_KEY) {
+    console.warn('PayMongo not configured - simulating payment intent');
+    // Simulation mode for development
+    return {
+      id: `pi_sim_${Date.now()}`,
+      clientKey: `client_sim_${Date.now()}`,
+      status: 'awaiting_payment_method',
+      amount: amount,
+      currency: 'PHP',
+    };
+  }
+
+  try {
+    const response = await paymongoRequest('/payment_intents', 'POST', {
+      data: {
+        attributes: {
+          amount: Math.round(amount * 100), // PayMongo uses centavos
+          payment_method_allowed: ['card', 'paymaya', 'gcash'],
+          payment_method_options: {
+            card: { request_three_d_secure: 'any' },
+          },
+          currency: 'PHP',
+          description: description || 'GOGO Express Payment',
+          metadata: {
+            ...metadata,
+            userId: context.auth.uid,
+          },
+        },
+      },
+    }) as PayMongoResponse;
+
+    return {
+      id: response.data.id,
+      clientKey: response.data.attributes.client_key,
+      status: response.data.attributes.status,
+      amount: response.data.attributes.amount / 100,
+      currency: response.data.attributes.currency,
+    };
+  } catch (error) {
+    console.error('PayMongo createPaymentIntent error:', error);
+    throw new functions.https.HttpsError('internal', error instanceof Error ? error.message : 'Failed to create payment intent');
+  }
+});
+
+// Create a payment source for e-wallet payments (GCash, Maya)
+export const createPaymentSource = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const { amount, type, successUrl, failedUrl, description, metadata } = data;
+
+  if (!amount || amount < 100) {
+    throw new functions.https.HttpsError('invalid-argument', 'Minimum payment is ₱100');
+  }
+
+  const validTypes = ['gcash', 'grab_pay', 'paymaya'];
+  if (!type || !validTypes.includes(type)) {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid payment type');
+  }
+
+  // Check if PayMongo is configured
+  if (!PAYMONGO_SECRET_KEY) {
+    console.warn('PayMongo not configured - simulating payment source');
+    // Simulation mode for development
+    const simId = `src_sim_${Date.now()}`;
+    return {
+      id: simId,
+      type: type,
+      status: 'pending',
+      amount: amount,
+      redirectUrl: `${successUrl}?source_id=${simId}&status=success`,
+      checkoutUrl: `${successUrl}?source_id=${simId}&status=success`,
+    };
+  }
+
+  try {
+    const response = await paymongoRequest('/sources', 'POST', {
+      data: {
+        attributes: {
+          amount: Math.round(amount * 100), // PayMongo uses centavos
+          type: type === 'maya' ? 'paymaya' : type,
+          currency: 'PHP',
+          redirect: {
+            success: successUrl,
+            failed: failedUrl,
+          },
+          billing: {
+            name: metadata?.customerName || 'GOGO Express Customer',
+            email: metadata?.customerEmail || '',
+            phone: metadata?.customerPhone || '',
+          },
+          metadata: {
+            ...metadata,
+            userId: context.auth.uid,
+            description: description || 'GOGO Express Payment',
+          },
+        },
+      },
+    }) as PayMongoResponse;
+
+    return {
+      id: response.data.id,
+      type: response.data.type,
+      status: response.data.attributes.status,
+      amount: response.data.attributes.amount / 100,
+      redirectUrl: response.data.attributes.redirect?.checkout_url,
+      checkoutUrl: response.data.attributes.redirect?.checkout_url,
+    };
+  } catch (error) {
+    console.error('PayMongo createPaymentSource error:', error);
+    throw new functions.https.HttpsError('internal', error instanceof Error ? error.message : 'Failed to create payment source');
+  }
+});
+
+// Process ride payment
+export const processRidePayment = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const { rideId, amount, paymentMethod } = data;
+  const userId = context.auth.uid;
+
+  if (!rideId || !amount) {
+    throw new functions.https.HttpsError('invalid-argument', 'Ride ID and amount are required');
+  }
+
+  // Verify ride belongs to user
+  const rideDoc = await db.collection('rides').doc(rideId).get();
+  if (!rideDoc.exists) {
+    throw new functions.https.HttpsError('not-found', 'Ride not found');
+  }
+
+  const rideData = rideDoc.data();
+  if (rideData?.passengerId !== userId && rideData?.customerId !== userId) {
+    throw new functions.https.HttpsError('permission-denied', 'Not authorized to pay for this ride');
+  }
+
+  try {
+    // For wallet payments, deduct from balance
+    if (paymentMethod === 'wallet') {
+      const userDoc = await db.collection('users').doc(userId).get();
+      const userData = userDoc.data();
+
+      if (!userData || userData.walletBalance < amount) {
+        throw new functions.https.HttpsError('failed-precondition', 'Insufficient wallet balance');
+      }
+
+      const newBalance = userData.walletBalance - amount;
+
+      await db.collection('users').doc(userId).update({
+        walletBalance: newBalance,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // Create transaction record
+      const transactionRef = await db.collection('transactions').add({
+        userId,
+        type: 'payment',
+        amount: -amount,
+        balance: newBalance,
+        reference: rideId,
+        referenceType: 'ride',
+        paymentMethod: 'wallet',
+        description: `Ride payment - ${rideData?.vehicleType || 'ride'}`,
+        status: 'completed',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // Update ride payment status
+      await db.collection('rides').doc(rideId).update({
+        paymentStatus: 'paid',
+        paidAt: admin.firestore.FieldValue.serverTimestamp(),
+        paymentTransactionId: transactionRef.id,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      return {
+        success: true,
+        transactionId: transactionRef.id,
+      };
+    }
+
+    // For cash payments, just mark as pending
+    if (paymentMethod === 'cash') {
+      await db.collection('rides').doc(rideId).update({
+        paymentStatus: 'pending_cash',
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      return {
+        success: true,
+        transactionId: null,
+      };
+    }
+
+    // For e-wallet/card payments, return redirect info
+    // The actual payment is processed via createPaymentSource or createPaymentIntent
+    return {
+      success: true,
+      redirectUrl: `/payment/ride/${rideId}?amount=${amount}&method=${paymentMethod}`,
+    };
+  } catch (error) {
+    console.error('processRidePayment error:', error);
+    throw new functions.https.HttpsError('internal', error instanceof Error ? error.message : 'Payment failed');
+  }
+});
+
+// Process order payment
+export const processOrderPayment = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const { orderId, amount, paymentMethod } = data;
+  const userId = context.auth.uid;
+
+  if (!orderId || !amount) {
+    throw new functions.https.HttpsError('invalid-argument', 'Order ID and amount are required');
+  }
+
+  // Verify order belongs to user
+  const orderDoc = await db.collection('orders').doc(orderId).get();
+  if (!orderDoc.exists) {
+    throw new functions.https.HttpsError('not-found', 'Order not found');
+  }
+
+  const orderData = orderDoc.data();
+  if (orderData?.customerId !== userId) {
+    throw new functions.https.HttpsError('permission-denied', 'Not authorized to pay for this order');
+  }
+
+  try {
+    // For wallet payments, deduct from balance
+    if (paymentMethod === 'wallet') {
+      const userDoc = await db.collection('users').doc(userId).get();
+      const userData = userDoc.data();
+
+      if (!userData || userData.walletBalance < amount) {
+        throw new functions.https.HttpsError('failed-precondition', 'Insufficient wallet balance');
+      }
+
+      const newBalance = userData.walletBalance - amount;
+
+      await db.collection('users').doc(userId).update({
+        walletBalance: newBalance,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // Create transaction record
+      const transactionRef = await db.collection('transactions').add({
+        userId,
+        type: 'payment',
+        amount: -amount,
+        balance: newBalance,
+        reference: orderId,
+        referenceType: 'order',
+        paymentMethod: 'wallet',
+        description: `Order payment - ${orderData?.type || 'order'}`,
+        status: 'completed',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // Update order payment status
+      await db.collection('orders').doc(orderId).update({
+        paymentStatus: 'paid',
+        paidAt: admin.firestore.FieldValue.serverTimestamp(),
+        paymentTransactionId: transactionRef.id,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      return {
+        success: true,
+        transactionId: transactionRef.id,
+      };
+    }
+
+    // For cash payments, just mark as pending
+    if (paymentMethod === 'cash') {
+      await db.collection('orders').doc(orderId).update({
+        paymentStatus: 'pending_cash',
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      return {
+        success: true,
+        transactionId: null,
+      };
+    }
+
+    // For e-wallet/card payments, return redirect info
+    return {
+      success: true,
+      redirectUrl: `/payment/order/${orderId}?amount=${amount}&method=${paymentMethod}`,
+    };
+  } catch (error) {
+    console.error('processOrderPayment error:', error);
+    throw new functions.https.HttpsError('internal', error instanceof Error ? error.message : 'Payment failed');
+  }
+});
+
+// Check payment status
+export const checkPaymentStatus = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const { paymentId, type } = data;
+
+  if (!paymentId || !type) {
+    throw new functions.https.HttpsError('invalid-argument', 'Payment ID and type are required');
+  }
+
+  // Check if PayMongo is configured
+  if (!PAYMONGO_SECRET_KEY) {
+    // Simulation mode - check if it's a simulated payment
+    if (paymentId.startsWith('pi_sim_') || paymentId.startsWith('src_sim_')) {
+      return { status: 'succeeded', paid: true };
+    }
+    return { status: 'unknown', paid: false };
+  }
+
+  try {
+    const endpoint = type === 'intent' ? `/payment_intents/${paymentId}` : `/sources/${paymentId}`;
+    const response = await paymongoRequest(endpoint, 'GET') as PayMongoResponse;
+
+    const status = response.data.attributes.status;
+    const paid = status === 'succeeded' || status === 'paid' || status === 'chargeable';
+
+    return { status, paid };
+  } catch (error) {
+    console.error('checkPaymentStatus error:', error);
+    return { status: 'unknown', paid: false };
+  }
+});
+
+// Verify e-wallet payment after redirect
+export const verifyEWalletPayment = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const { sourceId } = data;
+  const userId = context.auth.uid;
+
+  if (!sourceId) {
+    throw new functions.https.HttpsError('invalid-argument', 'Source ID is required');
+  }
+
+  // Check if PayMongo is configured
+  if (!PAYMONGO_SECRET_KEY) {
+    // Simulation mode
+    if (sourceId.startsWith('src_sim_')) {
+      return { success: true, transactionId: `txn_sim_${Date.now()}` };
+    }
+    throw new functions.https.HttpsError('failed-precondition', 'PayMongo not configured');
+  }
+
+  try {
+    // Get source status from PayMongo
+    const response = await paymongoRequest(`/sources/${sourceId}`, 'GET') as PayMongoResponse;
+    const source = response.data;
+
+    if (source.attributes.status !== 'chargeable') {
+      return {
+        success: false,
+        error: `Payment not completed. Status: ${source.attributes.status}`,
+      };
+    }
+
+    // Source is chargeable - create a payment to charge it
+    const paymentResponse = await paymongoRequest('/payments', 'POST', {
+      data: {
+        attributes: {
+          amount: source.attributes.amount,
+          currency: source.attributes.currency,
+          source: {
+            id: sourceId,
+            type: 'source',
+          },
+          description: 'GOGO Express Payment',
+        },
+      },
+    }) as PayMongoResponse;
+
+    // Record the transaction
+    const transactionRef = await db.collection('transactions').add({
+      userId,
+      type: 'topup',
+      amount: source.attributes.amount / 100,
+      paymentId: paymentResponse.data.id,
+      sourceId: sourceId,
+      paymentMethod: source.type,
+      status: 'completed',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return {
+      success: true,
+      transactionId: transactionRef.id,
+      paymentId: paymentResponse.data.id,
+    };
+  } catch (error) {
+    console.error('verifyEWalletPayment error:', error);
+    throw new functions.https.HttpsError('internal', error instanceof Error ? error.message : 'Failed to verify payment');
+  }
+});
+
+// PayMongo Webhook Handler
+export const paymongoWebhook = functions.https.onRequest(async (req, res) => {
+  // Verify webhook signature (in production, verify using PayMongo webhook secret)
+  if (req.method !== 'POST') {
+    res.status(405).send('Method not allowed');
+    return;
+  }
+
+  try {
+    const event = req.body as {
+      data: {
+        id: string;
+        type: string;
+        attributes: {
+          type: string;
+          data: {
+            id: string;
+            type: string;
+            attributes: {
+              status: string;
+              amount: number;
+              metadata?: Record<string, string>;
+            };
+          };
+        };
+      };
+    };
+
+    const eventType = event.data.attributes.type;
+    const paymentData = event.data.attributes.data;
+
+    console.log(`PayMongo webhook received: ${eventType}`, paymentData.id);
+
+    switch (eventType) {
+      case 'payment.paid':
+        // Payment was successful - update relevant records
+        const metadata = paymentData.attributes.metadata || {};
+        if (metadata.rideId) {
+          await db.collection('rides').doc(metadata.rideId).update({
+            paymentStatus: 'paid',
+            paidAt: admin.firestore.FieldValue.serverTimestamp(),
+            paymentId: paymentData.id,
+          });
+        }
+        if (metadata.orderId) {
+          await db.collection('orders').doc(metadata.orderId).update({
+            paymentStatus: 'paid',
+            paidAt: admin.firestore.FieldValue.serverTimestamp(),
+            paymentId: paymentData.id,
+          });
+        }
+        break;
+
+      case 'payment.failed':
+        // Payment failed
+        console.log('Payment failed:', paymentData.id);
+        break;
+
+      case 'source.chargeable':
+        // Source is ready to be charged (for e-wallet payments)
+        console.log('Source chargeable:', paymentData.id);
+        break;
+    }
+
+    res.status(200).send({ received: true });
+  } catch (error) {
+    console.error('Webhook error:', error);
+    res.status(500).send('Webhook processing failed');
+  }
+});

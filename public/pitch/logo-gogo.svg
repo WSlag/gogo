@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="400" height="300">
+  <defs>
+    <linearGradient id="speedGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#191919;stop-opacity:0.3"/>
+      <stop offset="100%" style="stop-color:#191919;stop-opacity:1"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="400" height="300" fill="white"/>
+
+  <!-- Speed Lines -->
+  <g fill="#191919">
+    <!-- Top speed lines -->
+    <rect x="40" y="70" width="60" height="8" rx="4" opacity="0.4"/>
+    <rect x="60" y="85" width="45" height="6" rx="3" opacity="0.5"/>
+    <rect x="50" y="98" width="55" height="7" rx="3.5" opacity="0.6"/>
+
+    <!-- Middle speed lines -->
+    <rect x="30" y="115" width="80" height="10" rx="5" opacity="0.7"/>
+    <rect x="45" y="132" width="65" height="8" rx="4" opacity="0.8"/>
+    <rect x="35" y="147" width="75" height="9" rx="4.5" opacity="0.9"/>
+
+    <!-- Bottom speed lines -->
+    <rect x="50" y="165" width="55" height="7" rx="3.5" opacity="0.6"/>
+    <rect x="60" y="178" width="40" height="6" rx="3" opacity="0.5"/>
+    <rect x="55" y="190" width="50" height="5" rx="2.5" opacity="0.4"/>
+
+    <!-- Dots -->
+    <circle cx="45" cy="108" r="4" opacity="0.5"/>
+    <circle cx="35" cy="160" r="5" opacity="0.6"/>
+    <circle cx="55" cy="200" r="3" opacity="0.4"/>
+  </g>
+
+  <!-- Main G Letter -->
+  <g transform="translate(120, 55)">
+    <path d="M120 70
+             C120 31.3 88.7 0 50 0
+             C11.3 0 -20 31.3 -20 70
+             C-20 108.7 11.3 140 50 140
+             C75 140 96.5 126 108 105
+             L108 85
+             L60 85
+             L60 100
+             L90 100
+             C82 115 67 125 50 125
+             C20 125 -5 100 -5 70
+             C-5 40 20 15 50 15
+             C72 15 90 28 100 48
+             L120 70Z"
+          fill="#191919"/>
+    <!-- Inner curve detail -->
+    <path d="M85 85 L85 75 C85 65 78 58 68 58 L55 58 L55 85 Z"
+          fill="#191919"/>
+  </g>
+
+  <!-- GOGO Text -->
+  <text x="200" y="260"
+        font-family="Inter, Arial, sans-serif"
+        font-size="48"
+        font-weight="700"
+        fill="#191919"
+        text-anchor="middle"
+        letter-spacing="8">GOGO</text>
+</svg>

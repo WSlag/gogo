@@ -184,10 +184,10 @@ export function usePushNotifications(): UsePushNotificationsReturn {
   const sendTestNotification = useCallback(() => {
     if (state.permission !== 'granted') return
 
-    new Notification('GOGO Test', {
+    new Notification('GOGO Express Test', {
       body: 'Push notifications are working!',
       icon: '/icons/icon-192x192.png',
-      badge: '/icons/badge-72x72.png',
+      badge: '/icons/icon-72x72.png',
       tag: 'test-notification',
     })
   }, [state.permission])

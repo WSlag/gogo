@@ -14,6 +14,7 @@ import {
 import { Button, Card, Input, Spinner } from '@/components/ui'
 import { useAuthStore } from '@/store/authStore'
 import { useDocumentUpload } from '@/hooks/useImageUpload'
+import { APP_CONFIG } from '@/config/app'
 import { doc, setDoc, updateDoc, Timestamp } from 'firebase/firestore'
 import { db } from '@/services/firebase/config'
 import type { VehicleType } from '@/types'
@@ -56,7 +57,7 @@ const VEHICLE_TYPES: { type: VehicleType; label: string; description: string }[]
 export default function DriverRegistration() {
   const navigate = useNavigate()
   const { user } = useAuthStore()
-  const { uploadImage, uploading } = useDocumentUpload()
+  const { uploadDocument, uploadState } = useDocumentUpload()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [currentStep, setCurrentStep] = useState<Step>('personal')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -127,7 +128,23 @@ export default function DriverRegistration() {
     if (!file || !currentUploadField) return
 
     try {
-      const url = await uploadImage(file)
+      // Skip upload in test mode, just use a placeholder
+      let url: string | null = null
+      if (APP_CONFIG.SKIP_DOCUMENT_VERIFICATION) {
+        url = `https://placeholder.test/${currentUploadField}`
+      } else {
+        // Map field to document type
+        const docTypeMap: Record<string, 'license' | 'registration' | 'insurance' | 'id'> = {
+          licenseFront: 'license',
+          licenseBack: 'license',
+          orCr: 'registration',
+          nbiClearance: 'id',
+          profileImage: 'id',
+        }
+        const docType = docTypeMap[currentUploadField] || 'id'
+        url = await uploadDocument(file, docType)
+      }
+
       if (currentUploadField === 'profileImage') {
         setPersonalInfo((prev) => ({ ...prev, profileImage: url }))
       } else {
@@ -143,7 +160,10 @@ export default function DriverRegistration() {
   }
 
   const handleSubmit = async () => {
-    if (!user?.uid) {
+    // Get user ID or use test ID when SKIP_AUTH is enabled
+    const userId = user?.uid || (APP_CONFIG.SKIP_AUTH ? 'test-driver' : null)
+
+    if (!userId) {
       setSubmitError('Please log in to submit your application')
       return
     }
@@ -160,7 +180,7 @@ export default function DriverRegistration() {
         firstName: personalInfo.firstName,
         lastName: personalInfo.lastName,
         phone: personalInfo.phone,
-        email: personalInfo.email || user.email || '',
+        email: personalInfo.email || user?.email || '',
 
         // Role
         role: 'driver',
@@ -212,7 +232,16 @@ export default function DriverRegistration() {
       }
 
       // Save to users collection
-      await setDoc(doc(db, 'users', user.uid), driverData, { merge: true })
+      await setDoc(doc(db, 'users', userId), driverData, { merge: true })
+
+      // Also create a driver document for the onDriverCreated trigger
+      await setDoc(doc(db, 'drivers', userId), {
+        id: userId,
+        userId: userId, // Required for useDriver query
+        ...driverData,
+        status: 'offline', // Initial driver status
+        verified: APP_CONFIG.AUTO_APPROVE_DRIVERS,
+      }, { merge: true })
 
       setSubmitSuccess(true)
     } catch (error) {
@@ -236,7 +265,7 @@ export default function DriverRegistration() {
           </div>
           <h2 className="text-xl font-bold text-gray-900 mb-2">Application Submitted!</h2>
           <p className="text-gray-600 mb-6">
-            Thank you for applying to become a GOGO driver. We'll review your application and get back to you within 2-3 business days.
+            Thank you for applying to become a GOGO Express driver. We'll review your application and get back to you within 2-3 business days.
           </p>
           <Button fullWidth onClick={() => navigate('/')}>
             Return Home

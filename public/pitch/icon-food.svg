@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="purpleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#9333ea"/>
+      <stop offset="100%" style="stop-color:#a855f7"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background Circle -->
+  <circle cx="60" cy="60" r="56" fill="#f3e8ff"/>
+
+  <!-- Food Bag -->
+  <g transform="translate(28, 20)">
+    <!-- Bag body -->
+    <path d="M8 35 L8 80 Q8 88 16 88 L48 88 Q56 88 56 80 L56 35 Z"
+          fill="url(#purpleGradient)"/>
+
+    <!-- Bag top fold -->
+    <path d="M5 35 L59 35 L56 28 L8 28 Z" fill="url(#purpleGradient)" opacity="0.8"/>
+
+    <!-- Handles -->
+    <path d="M20 28 L20 15 Q20 8 27 8 L37 8 Q44 8 44 15 L44 28"
+          stroke="url(#purpleGradient)" stroke-width="5" fill="none" stroke-linecap="round"/>
+
+    <!-- Food items peeking out -->
+    <circle cx="22" cy="45" r="8" fill="white" opacity="0.9"/>
+    <circle cx="42" cy="48" r="6" fill="white" opacity="0.9"/>
+    <rect x="28" y="40" width="10" height="14" rx="2" fill="white" opacity="0.9"/>
+
+    <!-- Smile on bag -->
+    <path d="M24 65 Q32 75 40 65" stroke="white" stroke-width="3" fill="none" stroke-linecap="round"/>
+  </g>
+
+  <!-- Steam lines -->
+  <g stroke="url(#purpleGradient)" stroke-width="2" stroke-linecap="round" opacity="0.5">
+    <path d="M45 18 Q48 12 45 6" fill="none"/>
+    <path d="M60 15 Q63 9 60 3" fill="none"/>
+    <path d="M75 18 Q78 12 75 6" fill="none"/>
+  </g>
+</svg>

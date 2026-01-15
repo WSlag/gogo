@@ -1,6 +1,10 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // ==========================================
+    // PRODUCTION RULES - Active
+    // ==========================================
+
     // Helper functions
     function isAuthenticated() {
       return request.auth != null;
@@ -14,85 +18,138 @@ service cloud.firestore {
       return isAuthenticated() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
     }
 
+    // Role checks using Custom Claims (preferred) with Firestore fallback
+    function getUserRole() {
+      return request.auth.token.role != null
+        ? request.auth.token.role
+        : get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function hasRole(role) {
+      return isAuthenticated() && getUserRole() == role;
+    }
+
+    function isAdmin() {
+      return hasRole('admin');
+    }
+
+    function isDriver() {
+      return hasRole('driver');
+    }
+
+    function isMerchant() {
+      return hasRole('merchant');
+    }
+
+    function isCustomer() {
+      return hasRole('customer');
+    }
+
+    function hasAnyRole(roles) {
+      return isAuthenticated() && getUserRole() in roles;
+    }
+
     // Users collection
     match /users/{userId} {
-      allow read: if isOwner(userId);
+      allow read: if isOwner(userId) || isAdmin();
       allow create: if isOwner(userId);
-      allow update: if isOwner(userId);
-      allow delete: if false; // Users cannot delete their own accounts directly
+      allow update: if (isOwner(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role'])) || isAdmin();
+      allow delete: if isAdmin();
     }
 
     // Drivers collection
     match /drivers/{driverId} {
       allow read: if isAuthenticated();
       allow create: if isOwner(driverId);
-      allow update: if isOwner(driverId);
-      allow delete: if false;
+      allow update: if isOwner(driverId) || isAdmin();
+      allow delete: if isAdmin();
     }
 
     // Merchants collection
     match /merchants/{merchantId} {
-      allow read: if true; // Public read for browsing
-      allow write: if false; // Only admin/backend can write
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update: if resource.data.ownerId == request.auth.uid || isAdmin();
+      allow delete: if isAdmin();
     }
 
     // Products collection
     match /products/{productId} {
-      allow read: if true; // Public read for browsing
-      allow write: if false; // Only admin/backend can write
+      allow read: if true;
+      allow create: if isMerchant() || isAdmin();
+      allow update: if isMerchant() || isAdmin();
+      allow delete: if isAdmin();
     }
 
     // Rides collection
     match /rides/{rideId} {
       allow read: if isAuthenticated() && (
         resource.data.passengerId == request.auth.uid ||
-        resource.data.driverId == request.auth.uid
+        resource.data.driverId == request.auth.uid ||
+        isAdmin()
       );
-      allow create: if isAuthenticated() &&
-        request.resource.data.passengerId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.passengerId == request.auth.uid;
       allow update: if isAuthenticated() && (
         resource.data.passengerId == request.auth.uid ||
-        resource.data.driverId == request.auth.uid
+        resource.data.driverId == request.auth.uid ||
+        isAdmin()
       );
       allow delete: if false;
     }
 
     // Orders collection
     match /orders/{orderId} {
-      allow read: if isAuthenticated() &&
-        resource.data.customerId == request.auth.uid;
-      allow create: if isAuthenticated() &&
-        request.resource.data.customerId == request.auth.uid;
-      allow update: if isAuthenticated() &&
-        resource.data.customerId == request.auth.uid;
+      allow read: if isAuthenticated() && (
+        resource.data.customerId == request.auth.uid ||
+        resource.data.merchantId == request.auth.uid ||
+        resource.data.driverId == request.auth.uid ||
+        isAdmin()
+      );
+      allow create: if isAuthenticated() && request.resource.data.customerId == request.auth.uid;
+      allow update: if isAuthenticated() && (
+        resource.data.customerId == request.auth.uid ||
+        resource.data.merchantId == request.auth.uid ||
+        resource.data.driverId == request.auth.uid ||
+        isAdmin()
+      );
       allow delete: if false;
     }
 
     // Transactions collection
     match /transactions/{transactionId} {
-      allow read: if isAuthenticated() &&
-        resource.data.userId == request.auth.uid;
-      allow create: if isAuthenticated() &&
-        request.resource.data.userId == request.auth.uid;
-      allow update: if false; // Transactions are immutable
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if false;
       allow delete: if false;
     }
 
     // Promos collection
     match /promos/{promoId} {
-      allow read: if true; // Public read for promo codes
-      allow write: if false; // Only admin can manage promos
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
     // Notifications collection
     match /notifications/{notificationId} {
-      allow read: if isAuthenticated() &&
-        resource.data.userId == request.auth.uid;
-      allow create: if false; // Only backend can create
-      allow update: if isAuthenticated() &&
-        resource.data.userId == request.auth.uid;
-      allow delete: if isAuthenticated() &&
-        resource.data.userId == request.auth.uid;
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAdmin() || isAuthenticated();
+      allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    // Chat messages collection
+    match /chats/{chatId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    match /chats/{chatId}/messages/{messageId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if false;
+      allow delete: if false;
     }
   }
 }

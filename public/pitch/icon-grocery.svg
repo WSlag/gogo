@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="purpleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#9333ea"/>
+      <stop offset="100%" style="stop-color:#a855f7"/>
+    </linearGradient>
+    <linearGradient id="greenGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#10b981"/>
+      <stop offset="100%" style="stop-color:#34d399"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background Circle -->
+  <circle cx="60" cy="60" r="56" fill="#f3e8ff"/>
+
+  <!-- Shopping Bag -->
+  <g transform="translate(25, 18)">
+    <!-- Bag body -->
+    <path d="M5 40 L0 85 Q0 92 8 92 L62 92 Q70 92 70 85 L65 40 Z"
+          fill="url(#purpleGradient)"/>
+
+    <!-- Bag opening -->
+    <ellipse cx="35" cy="40" rx="32" ry="8" fill="url(#purpleGradient)" opacity="0.8"/>
+
+    <!-- Handles -->
+    <path d="M18 40 L18 25 Q18 15 28 15 L42 15 Q52 15 52 25 L52 40"
+          stroke="url(#purpleGradient)" stroke-width="5" fill="none" stroke-linecap="round"/>
+
+    <!-- Groceries peeking out -->
+    <!-- Carrot -->
+    <path d="M20 35 L20 15 L25 15 L25 35" fill="#f97316"/>
+    <path d="M18 12 Q22.5 5 27 12" fill="url(#greenGradient)"/>
+
+    <!-- Apple -->
+    <circle cx="42" cy="28" r="10" fill="#ef4444"/>
+    <path d="M42 18 L44 14" stroke="#10b981" stroke-width="2"/>
+    <ellipse cx="45" cy="13" rx="3" ry="2" fill="url(#greenGradient)"/>
+
+    <!-- Bread -->
+    <ellipse cx="55" cy="32" rx="8" ry="12" fill="#fbbf24"/>
+
+    <!-- Celery/Greens -->
+    <path d="M12 30 Q8 20 12 10" stroke="url(#greenGradient)" stroke-width="4" fill="none"/>
+    <path d="M15 28 Q11 18 15 8" stroke="url(#greenGradient)" stroke-width="3" fill="none"/>
+  </g>
+</svg>

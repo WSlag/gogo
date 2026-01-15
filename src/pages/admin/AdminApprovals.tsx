@@ -96,16 +96,22 @@ export default function AdminApprovals() {
       )
 
       // Fetch pending merchant applications
-      const merchantQuery = query(
+      // Query for merchants with applicationStatus === 'pending' OR isApproved === false
+      // We need to handle legacy data that may not have applicationStatus set
+      const merchantQueryPending = query(
         collection(db, 'merchants'),
-        where('isApproved', '==', false),
-        where('applicationStatus', '==', 'pending'),
-        orderBy('submittedAt', 'desc')
+        where('applicationStatus', '==', 'pending')
       )
 
-      const [driverSnapshot, merchantSnapshot] = await Promise.all([
+      const merchantQueryUnapproved = query(
+        collection(db, 'merchants'),
+        where('isApproved', '==', false)
+      )
+
+      const [driverSnapshot, merchantPendingSnapshot, merchantUnapprovedSnapshot] = await Promise.all([
         filterType !== 'merchant' ? getDocs(driverQuery) : { docs: [] },
-        filterType !== 'driver' ? getDocs(merchantQuery) : { docs: [] },
+        filterType !== 'driver' ? getDocs(merchantQueryPending) : { docs: [] },
+        filterType !== 'driver' ? getDocs(merchantQueryUnapproved) : { docs: [] },
       ])
 
       const driverApps: DriverApplication[] = driverSnapshot.docs?.map((doc) => {
@@ -128,22 +134,27 @@ export default function AdminApprovals() {
         }
       }) || []
 
-      const merchantApps: MerchantApplication[] = merchantSnapshot.docs?.map((doc) => {
+      // Combine and deduplicate merchant results
+      const merchantDocsMap = new Map<string, typeof merchantPendingSnapshot.docs[0]>()
+      merchantPendingSnapshot.docs?.forEach(doc => merchantDocsMap.set(doc.id, doc))
+      merchantUnapprovedSnapshot.docs?.forEach(doc => merchantDocsMap.set(doc.id, doc))
+
+      const merchantApps: MerchantApplication[] = Array.from(merchantDocsMap.values()).map((doc) => {
         const data = doc.data()
         return {
           id: doc.id,
           type: 'merchant' as const,
-          businessName: data.businessName || 'Unknown',
+          businessName: data.businessName || data.name || 'Unknown',
           ownerName: data.ownerName || '',
           email: data.email || '',
           phone: data.phone || '',
-          photoURL: data.photoURL,
-          category: data.category || 'restaurant',
+          photoURL: data.photoURL || data.coverImage,
+          category: data.category || data.type || 'restaurant',
           address: data.address || '',
-          submittedAt: data.submittedAt?.toDate() || new Date(),
+          submittedAt: data.submittedAt?.toDate() || data.createdAt?.toDate() || new Date(),
           documents: data.documents || {},
         }
-      }) || []
+      }).sort((a, b) => b.submittedAt.getTime() - a.submittedAt.getTime())
 
       setApplications([...driverApps, ...merchantApps])
     } catch (error) {

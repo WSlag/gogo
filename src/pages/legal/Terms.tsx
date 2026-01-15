@@ -7,7 +7,7 @@ export default function Terms() {
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-white px-4 py-3 shadow-sm">
+      <div className="sticky top-0 z-30 lg:top-16 bg-white px-4 py-3 shadow-sm">
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate(-1)}
@@ -24,13 +24,13 @@ export default function Terms() {
 
         <h2>1. Acceptance of Terms</h2>
         <p>
-          By accessing and using the GOGO application ("App"), you agree to be bound by these
+          By accessing and using the GOGO Express application ("App"), you agree to be bound by these
           Terms of Service ("Terms"). If you do not agree to these Terms, please do not use the App.
         </p>
 
         <h2>2. Description of Service</h2>
         <p>
-          GOGO provides a platform that connects users with transportation services, food delivery,
+          GOGO Express provides a platform that connects users with transportation services, food delivery,
           and grocery shopping services in the Philippines. We act as an intermediary between users
           and service providers.
         </p>
@@ -69,7 +69,7 @@ export default function Terms() {
 
         <h2>7. Limitation of Liability</h2>
         <p>
-          GOGO is not liable for any indirect, incidental, or consequential damages arising from
+          GOGO Express is not liable for any indirect, incidental, or consequential damages arising from
           your use of the App or services obtained through the App.
         </p>
 

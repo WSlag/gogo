@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useRideStore, type PromoCodeInfo } from '@/store/rideStore'
 import { useAuthStore } from '@/store/authStore'
 import { useLocation } from './useLocation'
+import { APP_CONFIG } from '@/config/app'
 import {
   setDocument,
   getDocument,
@@ -16,7 +17,23 @@ import {
   GeoPoint,
   Timestamp,
 } from '@/services/firebase/firestore'
-import type { Ride, RideStatus, VehicleType, VehicleTypeInfo, Driver, Promo } from '@/types'
+import type { Ride, RideStatus, VehicleType, VehicleTypeInfo, Driver, RideFare } from '@/types'
+
+// Promo interface for Firestore promo documents
+interface Promo {
+  id: string
+  code: string
+  type: 'percentage' | 'fixed' | 'freeDelivery'
+  value: number
+  maxDiscount?: number
+  minOrder?: number
+  isActive: boolean
+  validFrom: Timestamp | string
+  validTo: Timestamp | string
+  usageLimit?: number
+  usedCount: number
+  applicableServices: string[]
+}
 
 // Vehicle type configurations with pricing
 export const VEHICLE_TYPES: Record<VehicleType, VehicleTypeInfo> = {
@@ -216,6 +233,12 @@ function calculateDiscount(
   return Math.round(discount)
 }
 
+// Rate limiting for promo code attempts
+const PROMO_RATE_LIMIT = {
+  maxAttempts: 5,
+  windowMs: 60000, // 1 minute
+}
+
 export function useRide(): UseRideReturn {
   const navigate = useNavigate()
   const { user } = useAuthStore()
@@ -227,6 +250,8 @@ export function useRide(): UseRideReturn {
     route,
     fare,
     paymentMethod,
+    isScheduled,
+    scheduledTime,
     promoCode,
     surgeMultiplier,
     activeRideId,
@@ -241,6 +266,7 @@ export function useRide(): UseRideReturn {
     setRoute,
     setFare,
     setPaymentMethod,
+    setScheduledRide,
     setPromoCode,
     setSurgeMultiplier,
     setActiveRide,
@@ -252,7 +278,8 @@ export function useRide(): UseRideReturn {
     resetRide,
   } = useRideStore()
 
-  const [unsubscribe, setUnsubscribe] = useState<(() => void) | null>(null)
+  // Rate limiting state for promo code attempts
+  const [promoAttempts, setPromoAttempts] = useState<number[]>([])
 
   // Update surge multiplier on mount and periodically
   useEffect(() => {
@@ -269,39 +296,46 @@ export function useRide(): UseRideReturn {
   }, [setSurgeMultiplier])
 
   // Subscribe to active ride updates
+  // Using ref to avoid stale closure issue with cleanup
   useEffect(() => {
-    if (activeRideId) {
-      const unsub = subscribeToDocument<Ride>(
-        collections.rides,
-        activeRideId,
-        (rideData) => {
-          if (rideData) {
-            setActiveRide(rideData.id, rideData.status)
+    if (!activeRideId) {
+      return
+    }
 
-            // Update driver info when assigned
-            if (rideData.driverId && !driver) {
-              loadDriver(rideData.driverId)
-            }
+    let isMounted = true
+    const unsub = subscribeToDocument<Ride>(
+      collections.rides,
+      activeRideId,
+      (rideData) => {
+        if (!isMounted) return
 
-            // Handle ride completion
-            if (rideData.status === 'completed' || rideData.status === 'cancelled') {
-              // Cleanup after delay
-              setTimeout(() => {
+        if (rideData) {
+          setActiveRide(rideData.id, rideData.status)
+
+          // Update driver info when assigned
+          if (rideData.driverId && !driver) {
+            loadDriver(rideData.driverId)
+          }
+
+          // Handle ride completion
+          if (rideData.status === 'completed' || rideData.status === 'cancelled') {
+            // Cleanup after delay
+            setTimeout(() => {
+              if (isMounted) {
                 resetRide()
-              }, 5000)
-            }
+              }
+            }, 5000)
           }
         }
-      )
-      setUnsubscribe(() => unsub)
-    }
-
-    return () => {
-      if (unsubscribe) {
-        unsubscribe()
       }
+    )
+
+    // Cleanup: unsubscribe when activeRideId changes or component unmounts
+    return () => {
+      isMounted = false
+      unsub()
     }
-  }, [activeRideId])
+  }, [activeRideId, driver, setActiveRide, resetRide])
 
   const loadDriver = async (driverId: string) => {
     const driverData = await getDocument<Driver>(collections.drivers, driverId)
@@ -337,6 +371,21 @@ export function useRide(): UseRideReturn {
       setError('Please enter a promo code')
       return false
     }
+
+    // Rate limiting check
+    const now = Date.now()
+    const recentAttempts = promoAttempts.filter(
+      (timestamp) => now - timestamp < PROMO_RATE_LIMIT.windowMs
+    )
+
+    if (recentAttempts.length >= PROMO_RATE_LIMIT.maxAttempts) {
+      const waitTime = Math.ceil((PROMO_RATE_LIMIT.windowMs - (now - recentAttempts[0])) / 1000)
+      setError(`Too many attempts. Please wait ${waitTime} seconds.`)
+      return false
+    }
+
+    // Record this attempt
+    setPromoAttempts([...recentAttempts, now])
 
     try {
       // Fetch promo from Firestore
@@ -418,7 +467,7 @@ export function useRide(): UseRideReturn {
       setError('Failed to apply promo code')
       return false
     }
-  }, [fare, setPromoCode, setFare, setError])
+  }, [fare, promoAttempts, setPromoCode, setFare, setError])
 
   const removePromoCode = useCallback(() => {
     setPromoCode(null)
@@ -492,7 +541,8 @@ export function useRide(): UseRideReturn {
   }, [pickup, dropoff, vehicleType, promoCode, getDirections, setRoute, setFare, setSurgeMultiplier, setError])
 
   const bookRide = useCallback(async (): Promise<string | null> => {
-    if (!user) {
+    // Skip auth check if SKIP_AUTH is enabled (for testing)
+    if (!APP_CONFIG.SKIP_AUTH && !user) {
       setError('Please login to book a ride')
       navigate('/auth/login')
       return null
@@ -503,51 +553,94 @@ export function useRide(): UseRideReturn {
       return null
     }
 
+    // Validate coordinates exist - don't create rides with invalid locations
+    if (!pickup.coordinates || !dropoff.coordinates) {
+      setError('Invalid pickup or dropoff location. Please select valid locations.')
+      return null
+    }
+
+    // Validate coordinates are in valid range
+    const isValidCoordinate = (lat: number, lng: number): boolean => {
+      return lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180 && !(lat === 0 && lng === 0)
+    }
+
+    if (!isValidCoordinate(pickup.coordinates.latitude, pickup.coordinates.longitude)) {
+      setError('Invalid pickup coordinates. Please select a valid location.')
+      return null
+    }
+
+    if (!isValidCoordinate(dropoff.coordinates.latitude, dropoff.coordinates.longitude)) {
+      setError('Invalid dropoff coordinates. Please select a valid location.')
+      return null
+    }
+
     try {
       setBooking(true)
       setError(null)
 
-      // Generate ride ID
-      const rideId = `ride_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      // Generate secure ride ID using crypto API with fallback
+      const generateSecureId = (): string => {
+        if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+          return `ride_${crypto.randomUUID()}`
+        }
+        // Fallback for older browsers
+        const array = new Uint32Array(4)
+        crypto.getRandomValues(array)
+        return `ride_${Array.from(array, n => n.toString(16).padStart(8, '0')).join('')}`
+      }
+      const rideId = generateSecureId()
 
       // Create ride document
+      // Build fare object without undefined values (Firestore doesn't accept undefined)
+      const fareData: RideFare = {
+        base: fare.base,
+        distance: fare.distance,
+        time: fare.time,
+        total: fare.total,
+        ...(fare.surge !== undefined && fare.surge > 0 && { surge: fare.surge }),
+        ...(fare.discount !== undefined && fare.discount > 0 && { discount: fare.discount }),
+      }
+
       const rideData: Partial<Ride> = {
         id: rideId,
-        passengerId: user.uid,
+        passengerId: user?.uid || 'test-customer',
         vehicleType,
         pickup: {
           address: pickup.address,
-          coordinates: pickup.coordinates || new GeoPoint(0, 0),
+          coordinates: pickup.coordinates,
         },
         dropoff: {
           address: dropoff.address,
-          coordinates: dropoff.coordinates || new GeoPoint(0, 0),
+          coordinates: dropoff.coordinates,
         },
-        route: route || undefined,
-        fare: {
-          base: fare.base,
-          distance: fare.distance,
-          time: fare.time,
-          surge: fare.surge,
-          discount: fare.discount,
-          total: fare.total,
-        },
+        ...(route && { route }),
+        fare: fareData,
         paymentMethod,
         paymentStatus: 'pending',
-        status: 'pending',
+        status: isScheduled ? 'scheduled' : 'pending',
       }
 
       await setDocument(collections.rides, rideId, {
         ...rideData,
-        promoCode: promoCode?.code,
+        ...(promoCode?.code && { promoCode: promoCode.code }),
+        ...(isScheduled && scheduledTime && { scheduledAt: Timestamp.fromDate(scheduledTime) }),
         surgeMultiplier,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       })
 
-      setActiveRide(rideId, 'pending')
+      setActiveRide(rideId, isScheduled ? 'scheduled' : 'pending')
       setBooking(false)
-      setFindingDriver(true)
+
+      // For scheduled rides, don't search for driver immediately
+      if (!isScheduled) {
+        setFindingDriver(true)
+      }
+
+      // Clear scheduled ride state after booking
+      if (isScheduled) {
+        setScheduledRide(false, null)
+      }
 
       // Navigate to tracking page
       navigate(`/rides/tracking/${rideId}`)
@@ -559,7 +652,7 @@ export function useRide(): UseRideReturn {
       setBooking(false)
       return null
     }
-  }, [user, pickup, dropoff, fare, route, vehicleType, paymentMethod, promoCode, surgeMultiplier, navigate, setBooking, setFindingDriver, setActiveRide, setError])
+  }, [user, pickup, dropoff, fare, route, vehicleType, paymentMethod, isScheduled, scheduledTime, promoCode, surgeMultiplier, navigate, setBooking, setFindingDriver, setActiveRide, setScheduledRide, setError])
 
   const cancelRide = useCallback(async (reason?: string): Promise<boolean> => {
     if (!activeRideId) {
@@ -572,6 +665,8 @@ export function useRide(): UseRideReturn {
         status: 'cancelled',
         cancelledAt: serverTimestamp(),
         cancellationReason: reason || 'Cancelled by passenger',
+        cancelledBy: 'passenger',
+        updatedAt: serverTimestamp(),
       })
 
       resetRide()

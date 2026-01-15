@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="purpleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#9333ea"/>
+      <stop offset="100%" style="stop-color:#a855f7"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background Circle -->
+  <circle cx="60" cy="60" r="56" fill="#f3e8ff"/>
+
+  <!-- Medicine Bottle -->
+  <g transform="translate(32, 18)">
+    <!-- Bottle cap -->
+    <rect x="12" y="8" width="32" height="12" rx="3" fill="url(#purpleGradient)"/>
+
+    <!-- Bottle body -->
+    <path d="M8 20 L8 78 Q8 85 15 85 L41 85 Q48 85 48 78 L48 20 Z"
+          fill="url(#purpleGradient)"/>
+
+    <!-- Label area -->
+    <rect x="12" y="35" width="32" height="35" rx="4" fill="white"/>
+
+    <!-- Medical cross on label -->
+    <rect x="23" y="42" width="10" height="22" rx="2" fill="url(#purpleGradient)"/>
+    <rect x="17" y="48" width="22" height="10" rx="2" fill="url(#purpleGradient)"/>
+
+    <!-- Shine effect -->
+    <path d="M12 25 L12 75" stroke="white" stroke-width="2" opacity="0.3"/>
+  </g>
+
+  <!-- Pills floating -->
+  <g fill="url(#purpleGradient)">
+    <ellipse cx="88" cy="35" rx="8" ry="5" opacity="0.7"/>
+    <ellipse cx="95" cy="50" rx="6" ry="4" opacity="0.5"/>
+    <ellipse cx="25" cy="85" rx="7" ry="4" opacity="0.6"/>
+  </g>
+
+  <!-- Sparkle/health indicator -->
+  <g stroke="url(#purpleGradient)" stroke-width="2" opacity="0.6">
+    <line x1="85" y1="70" x2="95" y2="70"/>
+    <line x1="90" y1="65" x2="90" y2="75"/>
+    <line x1="25" y1="30" x2="32" y2="30"/>
+    <line x1="28.5" y1="26" x2="28.5" y2="34"/>
+  </g>
+</svg>

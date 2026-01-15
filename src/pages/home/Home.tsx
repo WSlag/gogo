@@ -10,6 +10,7 @@ import { CategoryPills, filterByCategory } from '@/components/home/CategoryPills
 import { PromoCarousel } from '@/components/home/PromoCarousel'
 import { TrendingSection } from '@/components/home/TrendingSection'
 import { RecentRides } from '@/components/rides/RecentRides'
+import { useAuthStore } from '@/store/authStore'
 
 // Restaurant data with enhanced fields
 const featuredRestaurants = [
@@ -107,6 +108,10 @@ export default function Home() {
   const navigate = useNavigate()
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const { profile, isAuthenticated } = useAuthStore()
+
+  // Get user's first name from profile, or use generic greeting when not authenticated
+  const userName = isAuthenticated && profile?.firstName ? profile.firstName : 'there'
 
   // Filter restaurants based on category and search
   const filteredRestaurants = filterByCategory(allRestaurants, selectedCategory)
@@ -122,7 +127,7 @@ export default function Home() {
   const isMeriendaTime = hour >= 15 && hour < 18
 
   return (
-    <div className="bg-gray-50 min-h-screen pb-20 lg:pb-0 page-content">
+    <div className="bg-gray-50 min-h-screen pb-16 lg:pb-0 page-content">
       {/* Mobile Header - Compact 48px */}
       <MobileHeader />
 
@@ -134,7 +139,7 @@ export default function Home() {
         <div className="px-4 lg:px-6 pt-5 pb-6 max-w-7xl lg:mx-0">
           {/* Greeting Section */}
           <section className="mb-5">
-            <RideGreeting userName="Juan" />
+            <RideGreeting userName={userName} />
           </section>
 
           {/* === RIDE-FIRST HERO === */}
@@ -233,6 +238,7 @@ export default function Home() {
               </div>
             )}
           </section>
+
         </div>
       </main>
     </div>
@@ -311,7 +317,7 @@ function RestaurantCard({
           </p>
           <div className="mt-1.5 flex items-center gap-3 text-sm text-gray-500">
             <span className="flex items-center gap-1 font-semibold text-gray-900">
-              <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+              <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
               {restaurant.rating}
             </span>
             <span className="flex items-center gap-1">
@@ -357,7 +363,7 @@ function RestaurantCard({
         </p>
         <div className="mt-2 flex items-center gap-3 text-sm">
           <span className="flex items-center gap-1 font-semibold text-gray-900">
-            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+            <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
             {restaurant.rating}
           </span>
           <span className="flex items-center gap-1 text-gray-500">

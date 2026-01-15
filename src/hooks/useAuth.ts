@@ -10,6 +10,7 @@ import {
   onAuthChange,
   getStoredConfirmationResult,
   clearStoredConfirmationResult,
+  isRecaptchaReady,
 } from '@/services/firebase/auth'
 import {
   getDocument,
@@ -17,16 +18,24 @@ import {
   collections,
   serverTimestamp,
 } from '@/services/firebase/firestore'
-import type { User, UserProfile } from '@/types'
+import { APP_CONFIG } from '@/config/app'
+import type { User, UserProfile, UserRole } from '@/types'
 import type { ConfirmationResult, User as FirebaseUser } from 'firebase/auth'
 
 interface UseAuthReturn {
   user: FirebaseUser | null
   profile: UserProfile | null
+  role: UserRole | null
   isAuthenticated: boolean
   isLoading: boolean
   error: string | null
   confirmationResult: ConfirmationResult | null
+  // Role helpers
+  isCustomer: boolean
+  isDriver: boolean
+  isMerchant: boolean
+  isAdmin: boolean
+  // Actions
   initializeRecaptcha: (containerId: string) => void
   sendVerificationCode: (phone: string) => Promise<boolean>
   verifyCode: (code: string) => Promise<boolean>
@@ -36,6 +45,10 @@ interface UseAuthReturn {
   clearError: () => void
   createUserProfile: (data: Partial<User>) => Promise<boolean>
   updateUserProfile: (data: Partial<User>) => Promise<boolean>
+  // Role management
+  becomeDriver: () => Promise<boolean>
+  becomeMerchant: () => Promise<boolean>
+  switchRole: (role: UserRole) => Promise<boolean>
 }
 
 export function useAuth(): UseAuthReturn {
@@ -43,11 +56,17 @@ export function useAuth(): UseAuthReturn {
   const {
     user,
     profile,
+    role,
     isAuthenticated,
     isLoading,
     error,
+    isCustomer,
+    isDriver,
+    isMerchant,
+    isAdmin,
     setUser,
     setProfile,
+    setRole,
     setLoading,
     setError,
     logout: clearAuth,
@@ -72,16 +91,19 @@ export function useAuth(): UseAuthReturn {
             profileImage: userProfile.profileImage,
             walletBalance: userProfile.walletBalance || 0,
           })
+          // Set the user's role
+          setRole(userProfile.role || APP_CONFIG.DEFAULT_ROLE)
         }
       } else {
         setUser(null)
         setProfile(null)
+        setRole(null)
       }
       setLoading(false)
     })
 
     return () => unsubscribe()
-  }, [setUser, setProfile, setLoading])
+  }, [setUser, setProfile, setRole, setLoading])
 
   const initializeRecaptcha = useCallback((containerId: string) => {
     try {
@@ -95,6 +117,13 @@ export function useAuth(): UseAuthReturn {
     try {
       setLoading(true)
       setError(null)
+
+      // Check if reCAPTCHA is ready
+      if (!isRecaptchaReady()) {
+        setError('Security verification not ready. Please wait a moment and try again.')
+        return false
+      }
+
       const result = await sendOTP(phone)
       setConfirmationResult(result)
       return true
@@ -164,6 +193,7 @@ export function useAuth(): UseAuthReturn {
         // Create profile from Google data
         const newProfile: Partial<User> = {
           id: firebaseUser.uid,
+          role: APP_CONFIG.DEFAULT_ROLE,
           firstName: firebaseUser.displayName?.split(' ')[0] || '',
           lastName: firebaseUser.displayName?.split(' ').slice(1).join(' ') || '',
           email: firebaseUser.email || '',
@@ -200,6 +230,7 @@ export function useAuth(): UseAuthReturn {
           profileImage: newProfile.profileImage,
           walletBalance: 0,
         })
+        setRole(APP_CONFIG.DEFAULT_ROLE)
       } else {
         setProfile({
           id: existingProfile.id,
@@ -210,6 +241,7 @@ export function useAuth(): UseAuthReturn {
           profileImage: existingProfile.profileImage,
           walletBalance: existingProfile.walletBalance || 0,
         })
+        setRole(existingProfile.role || APP_CONFIG.DEFAULT_ROLE)
       }
       navigate('/')
       return true
@@ -220,7 +252,7 @@ export function useAuth(): UseAuthReturn {
     } finally {
       setLoading(false)
     }
-  }, [navigate, setUser, setProfile, setLoading, setError])
+  }, [navigate, setUser, setProfile, setRole, setLoading, setError])
 
   const loginWithFacebook = useCallback(async (): Promise<boolean> => {
     try {
@@ -235,6 +267,7 @@ export function useAuth(): UseAuthReturn {
         // Create profile from Facebook data
         const newProfile: Partial<User> = {
           id: firebaseUser.uid,
+          role: APP_CONFIG.DEFAULT_ROLE,
           firstName: firebaseUser.displayName?.split(' ')[0] || '',
           lastName: firebaseUser.displayName?.split(' ').slice(1).join(' ') || '',
           email: firebaseUser.email || '',
@@ -271,6 +304,7 @@ export function useAuth(): UseAuthReturn {
           profileImage: newProfile.profileImage,
           walletBalance: 0,
         })
+        setRole(APP_CONFIG.DEFAULT_ROLE)
       } else {
         setProfile({
           id: existingProfile.id,
@@ -281,6 +315,7 @@ export function useAuth(): UseAuthReturn {
           profileImage: existingProfile.profileImage,
           walletBalance: existingProfile.walletBalance || 0,
         })
+        setRole(existingProfile.role || APP_CONFIG.DEFAULT_ROLE)
       }
       navigate('/')
       return true
@@ -291,7 +326,7 @@ export function useAuth(): UseAuthReturn {
     } finally {
       setLoading(false)
     }
-  }, [navigate, setUser, setProfile, setLoading, setError])
+  }, [navigate, setUser, setProfile, setRole, setLoading, setError])
 
   const logout = useCallback(async (): Promise<void> => {
     try {
@@ -317,6 +352,7 @@ export function useAuth(): UseAuthReturn {
       setLoading(true)
       const newProfile: Partial<User> = {
         id: user.uid,
+        role: data.role || APP_CONFIG.DEFAULT_ROLE,
         phone: user.phoneNumber || data.phone || '',
         email: data.email || user.email || '',
         firstName: data.firstName || '',
@@ -364,6 +400,7 @@ export function useAuth(): UseAuthReturn {
         profileImage: newProfile.profileImage,
         walletBalance: 0,
       })
+      setRole(newProfile.role || APP_CONFIG.DEFAULT_ROLE)
 
       navigate('/')
       return true
@@ -374,7 +411,7 @@ export function useAuth(): UseAuthReturn {
     } finally {
       setLoading(false)
     }
-  }, [user, navigate, setProfile, setLoading, setError])
+  }, [user, navigate, setProfile, setRole, setLoading, setError])
 
   const updateUserProfile = useCallback(async (data: Partial<User>): Promise<boolean> => {
     if (!user) {
@@ -407,13 +444,73 @@ export function useAuth(): UseAuthReturn {
     }
   }, [user, profile, setProfile, setLoading, setError])
 
+  // Switch user role (auto-approve for testing)
+  const switchRole = useCallback(async (newRole: UserRole): Promise<boolean> => {
+    if (!user) {
+      setError('No authenticated user')
+      return false
+    }
+
+    try {
+      setLoading(true)
+
+      // Update role in Firestore
+      await setDocument(collections.users, user.uid, {
+        role: newRole,
+        updatedAt: serverTimestamp(),
+      })
+
+      // Update local state
+      setRole(newRole)
+
+      if (APP_CONFIG.IS_TESTING) {
+        console.log(`[Auth] Role switched to: ${newRole} (auto-approved for testing)`)
+      }
+
+      return true
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to switch role'
+      setError(errorMessage)
+      return false
+    } finally {
+      setLoading(false)
+    }
+  }, [user, setRole, setLoading, setError])
+
+  // Become a driver (auto-approve for testing)
+  const becomeDriver = useCallback(async (): Promise<boolean> => {
+    if (!APP_CONFIG.AUTO_APPROVE_DRIVERS && !APP_CONFIG.IS_TESTING) {
+      // In production, this would submit an application for review
+      setError('Driver applications require admin approval')
+      return false
+    }
+    return switchRole('driver')
+  }, [switchRole, setError])
+
+  // Become a merchant (auto-approve for testing)
+  const becomeMerchant = useCallback(async (): Promise<boolean> => {
+    if (!APP_CONFIG.AUTO_APPROVE_MERCHANTS && !APP_CONFIG.IS_TESTING) {
+      // In production, this would submit an application for review
+      setError('Merchant applications require admin approval')
+      return false
+    }
+    return switchRole('merchant')
+  }, [switchRole, setError])
+
   return {
     user,
     profile,
+    role,
     isAuthenticated,
     isLoading,
     error,
     confirmationResult,
+    // Role helpers
+    isCustomer,
+    isDriver,
+    isMerchant,
+    isAdmin,
+    // Actions
     initializeRecaptcha,
     sendVerificationCode,
     verifyCode,
@@ -423,6 +520,10 @@ export function useAuth(): UseAuthReturn {
     clearError,
     createUserProfile,
     updateUserProfile,
+    // Role management
+    becomeDriver,
+    becomeMerchant,
+    switchRole,
   }
 }
 

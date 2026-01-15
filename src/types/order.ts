@@ -1,6 +1,6 @@
 import type { Timestamp, GeoPoint } from 'firebase/firestore'
 
-export type OrderType = 'food' | 'grocery'
+export type OrderType = 'food' | 'grocery' | 'pharmacy'
 
 export type OrderStatus =
   | 'pending'
@@ -43,6 +43,7 @@ export interface Order {
   id: string
   customerId: string
   merchantId: string
+  merchantName: string
   driverId?: string
   type: OrderType
   items: OrderItem[]
@@ -84,13 +85,13 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
 }
 
 export const ORDER_STATUS_COLORS: Record<OrderStatus, string> = {
-  pending: 'bg-yellow-100 text-yellow-800',
-  confirmed: 'bg-blue-100 text-blue-800',
-  preparing: 'bg-orange-100 text-orange-800',
-  ready: 'bg-purple-100 text-purple-800',
-  picked_up: 'bg-indigo-100 text-indigo-800',
-  on_the_way: 'bg-cyan-100 text-cyan-800',
-  delivered: 'bg-green-100 text-green-800',
-  completed: 'bg-green-100 text-green-800',
-  cancelled: 'bg-red-100 text-red-800',
+  pending: 'bg-warning-light text-warning',
+  confirmed: 'bg-info-light text-info',
+  preparing: 'bg-secondary-100 text-secondary-700',
+  ready: 'bg-primary-100 text-primary-700',
+  picked_up: 'bg-primary-200 text-primary-800',
+  on_the_way: 'bg-info-light text-info',
+  delivered: 'bg-success-light text-success',
+  completed: 'bg-success-light text-success',
+  cancelled: 'bg-error-light text-error',
 }

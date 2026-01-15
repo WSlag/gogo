@@ -76,14 +76,14 @@ const services: ServiceItem[] = [
     label: 'Pharmacy',
     icon: Pill,
     path: '/pharmacy',
-    color: 'text-gray-600 group-hover:text-red-600',
-    bgColor: 'bg-gray-50 group-hover:bg-red-50'
+    color: 'text-gray-600 group-hover:text-rose-600',
+    bgColor: 'bg-gray-50 group-hover:bg-rose-50'
   },
   {
     id: 'more',
     label: 'More',
     icon: MoreHorizontal,
-    path: '/services',
+    path: '/',
     color: 'text-gray-500',
     bgColor: 'bg-gray-50'
   }

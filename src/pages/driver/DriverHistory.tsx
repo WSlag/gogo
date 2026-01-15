@@ -214,7 +214,7 @@ export default function DriverHistory() {
       </div>
 
       {/* Filters */}
-      <div className="px-4 py-3 bg-white border-b sticky top-0 z-10">
+      <div className="px-4 py-3 bg-white border-b sticky top-0 z-30 lg:top-16">
         <div className="flex items-center gap-2">
           <div className="flex-1 flex gap-2">
             {(['all', 'ride', 'delivery'] as const).map((type) => (

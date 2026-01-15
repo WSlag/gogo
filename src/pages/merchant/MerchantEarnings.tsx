@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
-  DollarSign,
   TrendingUp,
   TrendingDown,
   Calendar,
@@ -16,6 +15,7 @@ import {
   ArrowUpRight,
   ArrowDownRight,
 } from 'lucide-react'
+import { PesoSign } from '@/components/icons'
 import { Card, Badge, Button, Modal } from '@/components/ui'
 
 interface EarningsData {
@@ -293,7 +293,7 @@ export default function MerchantEarnings() {
                   ) : tx.type === 'refund' ? (
                     <ArrowUpRight className="h-5 w-5 text-red-600" />
                   ) : (
-                    <DollarSign className="h-5 w-5 text-orange-600" />
+                    <PesoSign className="h-5 w-5 text-orange-600" />
                   )}
                 </div>
                 <div className="flex-1 min-w-0">

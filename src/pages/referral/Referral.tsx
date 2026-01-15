@@ -7,13 +7,13 @@ import {
   CheckCircle,
   Share2,
   Users,
-  DollarSign,
   Ticket,
   ChevronRight,
   MessageCircle,
   Facebook,
   Twitter,
 } from 'lucide-react'
+import { PesoSign } from '@/components/icons'
 import { Card, Badge, Button, Modal } from '@/components/ui'
 import { useAuthStore } from '@/store/authStore'
 
@@ -70,7 +70,7 @@ export default function Referral() {
 
   const handleShare = (platform: string) => {
     if (!stats) return
-    const shareText = `Join GOGO and get ₱50 off your first ride! Use my referral code: ${stats.referralCode}\n\nDownload now: https://gogo.app`
+    const shareText = `Join GOGO Express and get ₱50 off your first ride! Use my referral code: ${stats.referralCode}\n\nDownload now: https://gogo.app`
 
     switch (platform) {
       case 'sms':
@@ -88,7 +88,7 @@ export default function Referral() {
       default:
         if (navigator.share) {
           navigator.share({
-            title: 'Join GOGO',
+            title: 'Join GOGO Express',
             text: shareText,
             url: 'https://gogo.app',
           })
@@ -188,7 +188,7 @@ export default function Referral() {
             <p className="text-xs text-gray-500">Total Referrals</p>
           </Card>
           <Card className="!p-4 text-center">
-            <DollarSign className="h-6 w-6 text-green-500 mx-auto mb-2" />
+            <PesoSign className="h-6 w-6 text-green-500 mx-auto mb-2" />
             <p className="text-2xl font-bold text-gray-900">₱{stats.totalEarnings}</p>
             <p className="text-xs text-gray-500">Total Earnings</p>
           </Card>
@@ -273,7 +273,7 @@ export default function Referral() {
             <li>• Reward is credited after referee completes their first ride</li>
             <li>• Referral code expires 30 days after sharing</li>
             <li>• Maximum of 50 referrals per month</li>
-            <li>• GOGO reserves the right to modify or cancel this program</li>
+            <li>• GOGO Express reserves the right to modify or cancel this program</li>
           </ul>
         </Card>
       </div>

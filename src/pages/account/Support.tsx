@@ -61,12 +61,12 @@ const FAQS: FAQ[] = [
     id: '6',
     category: 'Payments',
     question: 'What payment methods are accepted?',
-    answer: 'We accept Cash on Delivery, GCash, Maya, and GOGO Wallet. You can also link your credit or debit card for wallet top-ups.',
+    answer: 'We accept Cash on Delivery, GCash, Maya, and GOGO Express Wallet. You can also link your credit or debit card for wallet top-ups.',
   },
   {
     id: '7',
     category: 'Payments',
-    question: 'How do I top up my GOGO Wallet?',
+    question: 'How do I top up my GOGO Express Wallet?',
     answer: 'Go to the Wallet tab, tap "Top Up", select an amount, choose your payment method (GCash, Maya, or Card), and complete the payment.',
   },
   // Account
@@ -113,7 +113,7 @@ export default function Support() {
   return (
     <div className="min-h-screen bg-gray-50 pb-8">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-white shadow-sm">
+      <div className="sticky top-0 z-30 lg:top-16 bg-white shadow-sm">
         <div className="px-4 py-3 flex items-center gap-3">
           <button
             onClick={() => navigate(-1)}
@@ -144,18 +144,27 @@ export default function Support() {
         <Card>
           <h3 className="font-semibold text-gray-900 mb-3">Contact Us</h3>
           <div className="grid grid-cols-3 gap-3">
-            <button className="flex flex-col items-center gap-2 rounded-lg bg-primary-50 p-4">
+            <button
+              onClick={() => navigate('/account/support')}
+              className="flex flex-col items-center gap-2 rounded-lg bg-primary-50 p-4 hover:bg-primary-100 transition"
+            >
               <MessageCircle className="h-6 w-6 text-primary-600" />
               <span className="text-xs font-medium text-primary-600">Live Chat</span>
             </button>
-            <button className="flex flex-col items-center gap-2 rounded-lg bg-green-50 p-4">
+            <a
+              href="tel:+639171234567"
+              className="flex flex-col items-center gap-2 rounded-lg bg-green-50 p-4 hover:bg-green-100 transition"
+            >
               <Phone className="h-6 w-6 text-green-600" />
               <span className="text-xs font-medium text-green-600">Call Us</span>
-            </button>
-            <button className="flex flex-col items-center gap-2 rounded-lg bg-blue-50 p-4">
+            </a>
+            <a
+              href="mailto:support@gogo.ph"
+              className="flex flex-col items-center gap-2 rounded-lg bg-blue-50 p-4 hover:bg-blue-100 transition"
+            >
               <Mail className="h-6 w-6 text-blue-600" />
               <span className="text-xs font-medium text-blue-600">Email</span>
-            </button>
+            </a>
           </div>
           <p className="text-xs text-gray-500 mt-3 text-center">
             Available 24/7 for urgent issues
@@ -246,7 +255,7 @@ export default function Support() {
           <p className="text-sm text-gray-500 mt-1 mb-4">
             Our support team is here to assist you
           </p>
-          <Button fullWidth>
+          <Button fullWidth onClick={() => window.open('mailto:support@gogo.ph', '_blank')}>
             <MessageCircle className="h-5 w-5 mr-2" />
             Start a Conversation
           </Button>

@@ -8,13 +8,13 @@ import {
   Users,
   Star,
   Clock,
-  DollarSign,
   Calendar,
   Filter,
   Download,
   BarChart3,
   PieChart,
 } from 'lucide-react'
+import { PesoSign } from '@/components/icons'
 import { Card, Badge } from '@/components/ui'
 
 interface AnalyticsData {
@@ -134,7 +134,7 @@ export default function MerchantAnalytics() {
         <div className="grid grid-cols-2 gap-3">
           <Card className="!p-4">
             <div className="flex items-center gap-2 mb-2">
-              <DollarSign className="h-5 w-5 text-green-500" />
+              <PesoSign className="h-5 w-5 text-green-500" />
               <span className="text-sm text-gray-500">Revenue</span>
             </div>
             <p className="text-2xl font-bold text-gray-900">₱{(analytics.overview.totalRevenue / 1000).toFixed(0)}K</p>

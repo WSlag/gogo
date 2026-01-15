@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
   Star,
@@ -10,70 +10,44 @@ import {
   Plus,
   Minus,
   ShoppingBag,
+  Check,
+  AlertCircle,
 } from 'lucide-react'
-import { Button, Card, Spinner, Badge } from '@/components/ui'
+import { Button, Card, Spinner, Badge, Modal } from '@/components/ui'
+import { useMerchantDetail } from '@/hooks'
 import { useCartStore } from '@/store/cartStore'
+import type { Product } from '@/types'
 
-// Mock store data
-const MOCK_STORE = {
-  id: 'store1',
-  name: 'SM Supermarket',
-  type: 'grocery',
-  description: 'Your one-stop shop for groceries, fresh produce, and household items',
-  logo: '',
-  coverImage: '',
-  categories: ['Supermarket'],
-  rating: 4.5,
-  totalOrders: 12500,
-  deliveryFee: 69,
-  minOrder: 500,
-  estimatedDelivery: '45-60 min',
-  isOpen: true,
-  isFeatured: true,
-  address: 'SM City Cotabato',
+// Selected options and addons state
+interface SelectedOptions {
+  [optionName: string]: {
+    choice: string
+    price: number
+  }
 }
 
-// Mock products
-const MOCK_PRODUCTS = [
-  // Fruits & Vegetables
-  { id: 'p1', name: 'Banana (1kg)', description: 'Fresh local bananas', price: 60, category: 'Fruits & Vegetables', image: '' },
-  { id: 'p2', name: 'Apple Red (1kg)', description: 'Imported red apples', price: 180, category: 'Fruits & Vegetables', image: '' },
-  { id: 'p3', name: 'Tomatoes (500g)', description: 'Fresh local tomatoes', price: 45, category: 'Fruits & Vegetables', image: '' },
-  { id: 'p4', name: 'Carrots (500g)', description: 'Fresh carrots', price: 35, category: 'Fruits & Vegetables', image: '' },
-  // Meat & Seafood
-  { id: 'p5', name: 'Chicken Breast (1kg)', description: 'Fresh chicken breast', price: 220, category: 'Meat & Seafood', image: '' },
-  { id: 'p6', name: 'Pork Belly (1kg)', description: 'Fresh pork belly', price: 350, category: 'Meat & Seafood', image: '' },
-  { id: 'p7', name: 'Tilapia (1kg)', description: 'Fresh tilapia', price: 140, category: 'Meat & Seafood', image: '' },
-  // Dairy & Eggs
-  { id: 'p8', name: 'Fresh Milk 1L', description: 'Alaska Fresh Milk', price: 95, category: 'Dairy & Eggs', image: '' },
-  { id: 'p9', name: 'Eggs (12pcs)', description: 'Fresh eggs', price: 120, category: 'Dairy & Eggs', image: '' },
-  { id: 'p10', name: 'Cheese Slices', description: 'Eden cheese slices', price: 85, category: 'Dairy & Eggs', image: '' },
-  // Beverages
-  { id: 'p11', name: 'Coca-Cola 1.5L', description: 'Coca-Cola Original', price: 65, category: 'Beverages', image: '' },
-  { id: 'p12', name: 'Nestle Pure Life 1L', description: 'Mineral water', price: 25, category: 'Beverages', image: '' },
-  { id: 'p13', name: 'Nescafe 3in1 (10pcs)', description: 'Instant coffee', price: 120, category: 'Beverages', image: '' },
-  // Snacks
-  { id: 'p14', name: 'Piattos Cheese', description: 'Potato chips', price: 35, category: 'Snacks', image: '' },
-  { id: 'p15', name: 'Oreo Original', description: 'Chocolate cookies', price: 45, category: 'Snacks', image: '' },
-  // Household
-  { id: 'p16', name: 'Tide Powder 1kg', description: 'Laundry detergent', price: 180, category: 'Household', image: '' },
-  { id: 'p17', name: 'Joy Dishwashing 500ml', description: 'Dishwashing liquid', price: 95, category: 'Household', image: '' },
-]
+interface SelectedAddons {
+  [addonName: string]: {
+    selected: boolean
+    price: number
+  }
+}
 
 export default function StoreDetail() {
+  const { id } = useParams()
   const navigate = useNavigate()
-  const { cart, addItem, updateQuantity } = useCartStore()
+  const { merchant: store, products, categories, isLoading, error } = useMerchantDetail(id || '')
+  const { cart, addItem, updateQuantity, itemCount } = useCartStore()
 
   const [selectedCategory, setSelectedCategory] = useState<string>('All')
   const [searchQuery, setSearchQuery] = useState('')
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
+  const [quantity, setQuantity] = useState(1)
+  const [selectedOptions, setSelectedOptions] = useState<SelectedOptions>({})
+  const [selectedAddons, setSelectedAddons] = useState<SelectedAddons>({})
+  const [specialInstructions, setSpecialInstructions] = useState('')
 
-  // In production, fetch from Firebase
-  const store = MOCK_STORE
-  const products = MOCK_PRODUCTS
-  const isLoading = false
-
-  const categories = [...new Set(products.map((p) => p.category))]
-
+  // Filter products by category and search
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
       const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory
@@ -83,8 +57,9 @@ export default function StoreDetail() {
     })
   }, [products, selectedCategory, searchQuery])
 
+  // Group products by category
   const productsByCategory = useMemo(() => {
-    const grouped: Record<string, typeof products> = {}
+    const grouped: Record<string, Product[]> = {}
     filteredProducts.forEach((product) => {
       const category = product.category || 'Other'
       if (!grouped[category]) {
@@ -100,20 +75,26 @@ export default function StoreDetail() {
     return item?.quantity || 0
   }
 
-  const handleAddToCart = (product: typeof MOCK_PRODUCTS[0]) => {
+  const handleAddToCart = (product: Product) => {
+    if (!store) return
+
     addItem(
       {
         productId: product.id,
         merchantId: store.id,
         name: product.name,
-        price: product.price,
+        price: product.salePrice || product.price,
         quantity: 1,
-        total: product.price,
         image: product.image,
+        total: product.salePrice || product.price,
       },
-      store.id,
-      store.name,
-      'grocery'
+      {
+        merchantId: store.id,
+        merchantName: store.name,
+        merchantType: (store.type || 'grocery') as 'grocery' | 'pharmacy' | 'restaurant' | 'convenience',
+        deliveryFee: store.deliveryFee,
+        minOrder: store.minOrder,
+      }
     )
   }
 
@@ -122,19 +103,166 @@ export default function StoreDetail() {
     updateQuantity(productId, currentQty + delta)
   }
 
-  const cartItemCount = cart?.items.reduce((sum, item) => sum + item.quantity, 0) || 0
-  const cartTotal = cart?.items.reduce((sum, item) => sum + item.price * item.quantity, 0) || 0
+  const openProductModal = (product: Product) => {
+    setSelectedProduct(product)
+    setQuantity(getCartQuantity(product.id) || 1)
+    setSelectedOptions({})
+    setSelectedAddons({})
+    setSpecialInstructions('')
+
+    // Pre-select required options with first choice
+    if (product.options) {
+      const initialOptions: SelectedOptions = {}
+      product.options.forEach((option) => {
+        if (option.required && option.choices.length > 0) {
+          initialOptions[option.name] = {
+            choice: option.choices[0].name,
+            price: option.choices[0].price,
+          }
+        }
+      })
+      setSelectedOptions(initialOptions)
+    }
+  }
+
+  // Calculate total price with options and addons
+  const calculateItemTotal = () => {
+    if (!selectedProduct) return 0
+
+    let basePrice = selectedProduct.salePrice || selectedProduct.price
+
+    // Add options prices
+    Object.values(selectedOptions).forEach((option) => {
+      basePrice += option.price
+    })
+
+    // Add addons prices
+    Object.values(selectedAddons).forEach((addon) => {
+      if (addon.selected) {
+        basePrice += addon.price
+      }
+    })
+
+    return basePrice * quantity
+  }
+
+  // Check if all required options are selected
+  const areRequiredOptionsSelected = () => {
+    if (!selectedProduct?.options) return true
+
+    return selectedProduct.options
+      .filter((option) => option.required)
+      .every((option) => selectedOptions[option.name])
+  }
+
+  const handleOptionSelect = (optionName: string, choice: string, price: number) => {
+    setSelectedOptions((prev) => ({
+      ...prev,
+      [optionName]: { choice, price },
+    }))
+  }
+
+  const handleAddonToggle = (addonName: string, price: number) => {
+    setSelectedAddons((prev) => ({
+      ...prev,
+      [addonName]: {
+        selected: !prev[addonName]?.selected,
+        price,
+      },
+    }))
+  }
+
+  const handleAddFromModal = () => {
+    if (!selectedProduct || !store) return
+    if (!areRequiredOptionsSelected()) return
+
+    // Build options array for cart
+    const options = Object.entries(selectedOptions).map(([name, data]) => ({
+      name,
+      choice: data.choice,
+      price: data.price,
+    }))
+
+    // Build addons array for cart
+    const addons = Object.entries(selectedAddons)
+      .filter(([, data]) => data.selected)
+      .map(([name, data]) => ({
+        name,
+        price: data.price,
+      }))
+
+    // Calculate item price including options and addons
+    let itemPrice = selectedProduct.salePrice || selectedProduct.price
+    options.forEach((opt) => (itemPrice += opt.price))
+    addons.forEach((addon) => (itemPrice += addon.price))
+
+    // Generate a unique ID if product has options/addons
+    const hasCustomization = options.length > 0 || addons.length > 0 || specialInstructions
+    const productId = hasCustomization
+      ? `${selectedProduct.id}_${Date.now()}`
+      : selectedProduct.id
+
+    addItem(
+      {
+        productId,
+        merchantId: store.id,
+        name: selectedProduct.name,
+        price: itemPrice,
+        quantity: quantity,
+        image: selectedProduct.image,
+        options: options.length > 0 ? options : undefined,
+        addons: addons.length > 0 ? addons : undefined,
+        specialInstructions: specialInstructions || undefined,
+        total: itemPrice * quantity,
+      },
+      {
+        merchantId: store.id,
+        merchantName: store.name,
+        merchantType: (store.type || 'grocery') as 'grocery' | 'pharmacy' | 'restaurant' | 'convenience',
+        deliveryFee: store.deliveryFee,
+        minOrder: store.minOrder,
+      }
+    )
+
+    setSelectedProduct(null)
+  }
+
+  // Check if product has customization options
+  const hasCustomizationOptions = (product: Product) => {
+    return (product.options && product.options.length > 0) ||
+           (product.addons && product.addons.length > 0)
+  }
 
   if (isLoading) {
     return (
-      <div className="flex h-screen items-center justify-center">
+      <div className="flex h-screen flex-col items-center justify-center">
         <Spinner size="lg" />
+        <p className="mt-4 text-gray-500">Loading store...</p>
       </div>
     )
   }
 
+  if (error || !store) {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center p-4">
+        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-red-50 mb-4">
+          <AlertCircle className="h-8 w-8 text-red-500" />
+        </div>
+        <h3 className="text-lg font-semibold text-gray-900">Store not found</h3>
+        <p className="mt-1 text-sm text-gray-500 text-center max-w-xs">
+          {error?.message || 'This store may no longer be available'}
+        </p>
+        <Button className="mt-4" onClick={() => navigate('/grocery')}>
+          Back to Grocery
+        </Button>
+      </div>
+    )
+  }
+
+  const cartTotal = cart?.subtotal || 0
+
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
+    <div className="min-h-screen bg-gray-50 pb-36">
       {/* Header */}
       <div className="relative h-40 bg-gradient-to-br from-green-500 to-green-700">
         <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
@@ -158,31 +286,39 @@ export default function StoreDetail() {
       {/* Store Info */}
       <div className="bg-white px-4 py-4 -mt-6 rounded-t-3xl relative">
         <div className="flex items-start gap-3">
-          <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-green-100">
-            <ShoppingBag className="h-8 w-8 text-green-600" />
-          </div>
+          {store.logo ? (
+            <img
+              src={store.logo}
+              alt={store.name}
+              className="h-16 w-16 rounded-xl object-cover"
+            />
+          ) : (
+            <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-green-100">
+              <ShoppingBag className="h-8 w-8 text-green-600" />
+            </div>
+          )}
           <div className="flex-1">
             <h1 className="text-xl font-bold text-gray-900">{store.name}</h1>
             <p className="text-sm text-gray-500 line-clamp-1">{store.description}</p>
             <div className="mt-2 flex items-center gap-3 text-sm">
               <div className="flex items-center gap-1">
                 <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
-                <span className="font-medium">{store.rating}</span>
+                <span className="font-medium">{store.rating?.toFixed(1) || '0.0'}</span>
               </div>
               <span className="text-gray-300">•</span>
               <div className="flex items-center gap-1 text-gray-500">
                 <Clock className="h-4 w-4" />
-                <span>{store.estimatedDelivery}</span>
+                <span>{store.estimatedDelivery || store.deliveryTime || '30-45 min'}</span>
               </div>
               <span className="text-gray-300">•</span>
-              <span className="text-gray-500">₱{store.deliveryFee} delivery</span>
+              <span className="text-gray-500">₱{store.deliveryFee || 0} delivery</span>
             </div>
           </div>
         </div>
 
         <div className="mt-3 flex items-center gap-2">
-          <Badge variant="secondary">Min. ₱{store.minOrder}</Badge>
-          {store.categories.map((cat) => (
+          <Badge variant="secondary">Min. ₱{store.minOrder || 0}</Badge>
+          {store.categories?.map((cat) => (
             <Badge key={cat} variant="secondary">{cat}</Badge>
           ))}
         </div>
@@ -197,13 +333,13 @@ export default function StoreDetail() {
             placeholder="Search products..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-xl bg-gray-100 py-3 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="w-full rounded-xl bg-gray-100 py-3 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
           />
         </div>
       </div>
 
       {/* Category Pills */}
-      <div className="sticky top-0 z-10 bg-white border-b">
+      <div className="sticky top-0 z-30 lg:top-16 bg-white border-b">
         <div className="overflow-x-auto scrollbar-hide">
           <div className="flex gap-2 px-4 py-3">
             <button
@@ -238,44 +374,94 @@ export default function StoreDetail() {
         {Object.entries(productsByCategory).map(([category, items]) => (
           <div key={category}>
             <h2 className="text-lg font-bold text-gray-900 mb-3">{category}</h2>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-3">
               {items.map((product) => {
                 const cartQty = getCartQuantity(product.id)
+                const hasOptions = hasCustomizationOptions(product)
                 return (
-                  <Card key={product.id} className="overflow-hidden">
-                    <div className="h-24 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center -mx-4 -mt-4 mb-3">
-                      <span className="text-3xl">🛒</span>
-                    </div>
-                    <h3 className="font-medium text-gray-900 text-sm line-clamp-2">{product.name}</h3>
-                    <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">{product.description}</p>
-                    <div className="mt-2 flex items-center justify-between">
-                      <span className="font-semibold text-gray-900">₱{product.price}</span>
-                      {cartQty > 0 ? (
-                        <div className="flex items-center gap-1 rounded-full bg-green-600 px-2 py-1">
-                          <button
-                            onClick={() => handleUpdateQuantity(product.id, -1)}
-                            className="p-0.5"
-                          >
-                            <Minus className="h-3 w-3 text-white" />
-                          </button>
-                          <span className="text-xs font-medium text-white min-w-[1rem] text-center">
-                            {cartQty}
-                          </span>
-                          <button
-                            onClick={() => handleUpdateQuantity(product.id, 1)}
-                            className="p-0.5"
-                          >
-                            <Plus className="h-3 w-3 text-white" />
-                          </button>
+                  <Card
+                    key={product.id}
+                    className="cursor-pointer hover:shadow-md transition-shadow"
+                    onClick={() => openProductModal(product)}
+                  >
+                    <div className="flex gap-3">
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-gray-900">{product.name}</h3>
+                        <p className="text-sm text-gray-500 line-clamp-2 mt-1">
+                          {product.description}
+                        </p>
+                        <div className="mt-2 flex items-center gap-2">
+                          {product.salePrice ? (
+                            <>
+                              <span className="font-semibold text-green-600">
+                                ₱{product.salePrice}
+                              </span>
+                              <span className="text-sm text-gray-400 line-through">
+                                ₱{product.price}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="font-semibold text-gray-900">
+                              ₱{product.price}
+                            </span>
+                          )}
+                          {hasOptions && (
+                            <span className="text-xs text-gray-500">• Options available</span>
+                          )}
                         </div>
-                      ) : (
-                        <button
-                          onClick={() => handleAddToCart(product)}
-                          className="flex h-7 w-7 items-center justify-center rounded-full bg-green-600 text-white"
+                      </div>
+                      <div className="relative">
+                        {product.image ? (
+                          <img
+                            src={product.image}
+                            alt={product.name}
+                            className="h-20 w-20 rounded-lg object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-20 w-20 items-center justify-center rounded-lg bg-gray-100 text-2xl">
+                            🛒
+                          </div>
+                        )}
+                        {/* Add/Update Button */}
+                        <div
+                          className="absolute -bottom-2 -right-2"
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          <Plus className="h-4 w-4" />
-                        </button>
-                      )}
+                          {cartQty > 0 && !hasOptions ? (
+                            <div className="flex items-center gap-1 rounded-full bg-green-600 px-2 py-1">
+                              <button
+                                onClick={() => handleUpdateQuantity(product.id, -1)}
+                                className="p-0.5"
+                              >
+                                <Minus className="h-4 w-4 text-white" />
+                              </button>
+                              <span className="text-sm font-medium text-white min-w-[1.5rem] text-center">
+                                {cartQty}
+                              </span>
+                              <button
+                                onClick={() => handleUpdateQuantity(product.id, 1)}
+                                className="p-0.5"
+                              >
+                                <Plus className="h-4 w-4 text-white" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={(e) => {
+                                if (hasOptions) {
+                                  // Let the card click handler open the modal
+                                  return
+                                }
+                                e.stopPropagation()
+                                handleAddToCart(product)
+                              }}
+                              className="flex h-8 w-8 items-center justify-center rounded-full bg-green-600 text-white shadow-md"
+                            >
+                              <Plus className="h-5 w-5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </Card>
                 )
@@ -286,14 +472,22 @@ export default function StoreDetail() {
 
         {filteredProducts.length === 0 && (
           <div className="text-center py-8">
-            <p className="text-gray-500">No products found</p>
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 mx-auto mb-4">
+              <ShoppingBag className="h-8 w-8 text-gray-400" />
+            </div>
+            <p className="text-gray-500">
+              {products.length === 0
+                ? 'No products available for this store yet'
+                : 'No products found matching your search'
+              }
+            </p>
           </div>
         )}
       </div>
 
       {/* Cart Footer */}
-      {cartItemCount > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 pb-safe">
+      {itemCount > 0 && (
+        <div className="fixed bottom-16 left-0 right-0 lg:bottom-0 lg:left-[240px] bg-white border-t p-4 pb-safe z-50">
           <Button
             fullWidth
             size="lg"
@@ -302,12 +496,173 @@ export default function StoreDetail() {
           >
             <div className="flex items-center gap-2">
               <ShoppingBag className="h-5 w-5" />
-              <span>{cartItemCount} items</span>
+              <span>{itemCount} items</span>
             </div>
             <span>₱{cartTotal.toFixed(2)}</span>
           </Button>
         </div>
       )}
+
+      {/* Product Modal */}
+      <Modal
+        isOpen={!!selectedProduct}
+        onClose={() => setSelectedProduct(null)}
+        title={selectedProduct?.name || ''}
+      >
+        {selectedProduct && (
+          <div className="space-y-4 max-h-[70vh] overflow-y-auto">
+            {selectedProduct.image && (
+              <img
+                src={selectedProduct.image}
+                alt={selectedProduct.name}
+                className="w-full h-48 object-cover rounded-lg"
+              />
+            )}
+            <p className="text-gray-600">{selectedProduct.description}</p>
+            <div className="flex items-center gap-2">
+              {selectedProduct.salePrice ? (
+                <>
+                  <span className="text-xl font-bold text-green-600">
+                    ₱{selectedProduct.salePrice}
+                  </span>
+                  <span className="text-gray-400 line-through">
+                    ₱{selectedProduct.price}
+                  </span>
+                </>
+              ) : (
+                <span className="text-xl font-bold text-gray-900">
+                  ₱{selectedProduct.price}
+                </span>
+              )}
+            </div>
+
+            {/* Product Options */}
+            {selectedProduct.options && selectedProduct.options.length > 0 && (
+              <div className="space-y-4 border-t pt-4">
+                {selectedProduct.options.map((option) => (
+                  <div key={option.name}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-semibold text-gray-900">{option.name}</span>
+                      {option.required && (
+                        <span className="text-xs font-medium text-red-500 bg-red-50 px-2 py-0.5 rounded">
+                          Required
+                        </span>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      {option.choices.map((choice) => {
+                        const isSelected = selectedOptions[option.name]?.choice === choice.name
+                        return (
+                          <button
+                            key={choice.name}
+                            onClick={() => handleOptionSelect(option.name, choice.name, choice.price)}
+                            className={`flex w-full items-center justify-between rounded-lg border p-3 transition ${
+                              isSelected
+                                ? 'border-green-500 bg-green-50'
+                                : 'border-gray-200 hover:border-gray-300'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={`flex h-5 w-5 items-center justify-center rounded-full border-2 ${
+                                isSelected ? 'border-green-500 bg-green-500' : 'border-gray-300'
+                              }`}>
+                                {isSelected && <Check className="h-3 w-3 text-white" />}
+                              </div>
+                              <span className={isSelected ? 'font-medium text-green-600' : 'text-gray-700'}>
+                                {choice.name}
+                              </span>
+                            </div>
+                            {choice.price > 0 && (
+                              <span className="text-sm text-gray-500">+₱{choice.price}</span>
+                            )}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Product Addons */}
+            {selectedProduct.addons && selectedProduct.addons.length > 0 && (
+              <div className="border-t pt-4">
+                <span className="font-semibold text-gray-900 block mb-2">Add-ons</span>
+                <div className="space-y-2">
+                  {selectedProduct.addons.filter(addon => addon.isAvailable).map((addon) => {
+                    const isSelected = selectedAddons[addon.name]?.selected
+                    return (
+                      <button
+                        key={addon.name}
+                        onClick={() => handleAddonToggle(addon.name, addon.price)}
+                        className={`flex w-full items-center justify-between rounded-lg border p-3 transition ${
+                          isSelected
+                            ? 'border-green-500 bg-green-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`flex h-5 w-5 items-center justify-center rounded border-2 ${
+                            isSelected ? 'border-green-500 bg-green-500' : 'border-gray-300'
+                          }`}>
+                            {isSelected && <Check className="h-3 w-3 text-white" />}
+                          </div>
+                          <span className={isSelected ? 'font-medium text-green-600' : 'text-gray-700'}>
+                            {addon.name}
+                          </span>
+                        </div>
+                        <span className="text-sm text-gray-500">+₱{addon.price}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Special Instructions */}
+            <div className="border-t pt-4">
+              <span className="font-semibold text-gray-900 block mb-2">Special Instructions</span>
+              <textarea
+                value={specialInstructions}
+                onChange={(e) => setSpecialInstructions(e.target.value)}
+                placeholder="E.g., Ripe bananas only, check expiry date, etc."
+                className="w-full rounded-lg border border-gray-200 p-3 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
+                rows={2}
+              />
+            </div>
+
+            {/* Quantity Selector */}
+            <div className="flex items-center justify-between border rounded-lg p-3">
+              <span className="font-medium">Quantity</span>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100"
+                >
+                  <Minus className="h-4 w-4" />
+                </button>
+                <span className="font-semibold w-8 text-center">{quantity}</span>
+                <button
+                  onClick={() => setQuantity(quantity + 1)}
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-green-600 text-white"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            <Button
+              fullWidth
+              size="lg"
+              onClick={handleAddFromModal}
+              disabled={!areRequiredOptionsSelected()}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              Add to Cart - ₱{calculateItemTotal().toFixed(2)}
+            </Button>
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }

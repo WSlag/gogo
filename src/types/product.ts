@@ -73,4 +73,5 @@ export interface Cart {
   deliveryFee: number
   serviceFee: number
   total: number
+  minOrder?: number
 }
