@@ -48,23 +48,25 @@ const supportMenuItems: MenuItem[] = [
 
 export default function Profile() {
   const navigate = useNavigate()
-  const { logout } = useAuth()
+  const { logout, profile, user: firebaseUser } = useAuth()
   const [copied, setCopied] = useState(false)
 
-  // Mock user data
+  // Use actual user data from auth context with fallbacks
   const user = {
-    firstName: 'Juan',
-    lastName: 'Dela Cruz',
-    phone: '+63 917 123 4567',
-    email: 'juan@email.com',
-    memberSince: 'December 2024',
-    totalOrders: 45,
-    totalRides: 23,
-    rating: 4.9,
-    membershipTier: 'Gold',
-    referralCode: 'JUAN2024',
-    walletBalance: 1250,
-    loyaltyPoints: 3420,
+    firstName: profile?.firstName || 'User',
+    lastName: profile?.lastName || '',
+    phone: profile?.phone || firebaseUser?.phoneNumber || 'Not set',
+    email: profile?.email || firebaseUser?.email || '',
+    memberSince: profile?.createdAt
+      ? new Date(profile.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+      : 'New member',
+    totalOrders: profile?.stats?.totalOrders || 0,
+    totalRides: profile?.stats?.totalRides || 0,
+    rating: profile?.stats?.rating || 5.0,
+    membershipTier: profile?.membershipTier || 'Bronze',
+    referralCode: profile?.referralCode || ('GOGO' + (firebaseUser?.uid?.slice(0, 6).toUpperCase() || 'NEW')),
+    walletBalance: profile?.walletBalance || 0,
+    loyaltyPoints: profile?.loyaltyPoints || 0,
   }
 
   const handleLogout = async () => {
@@ -104,7 +106,7 @@ export default function Profile() {
                 {/* Avatar */}
                 <div className="relative shrink-0">
                   <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-primary-500 to-primary-600 text-xl font-bold text-white">
-                    {user.firstName[0]}{user.lastName[0]}
+                    {user.firstName?.[0] || 'U'}{user.lastName?.[0] || ''}
                   </div>
                   <button
                     onClick={() => navigate('/account/edit')}

@@ -36,7 +36,7 @@ interface UseAuthReturn {
   isMerchant: boolean
   isAdmin: boolean
   // Actions
-  initializeRecaptcha: (containerId: string) => void
+  initializeRecaptcha: (containerId: string) => Promise<boolean>
   sendVerificationCode: (phone: string) => Promise<boolean>
   verifyCode: (code: string) => Promise<boolean>
   loginWithGoogle: () => Promise<boolean>
@@ -105,11 +105,13 @@ export function useAuth(): UseAuthReturn {
     return () => unsubscribe()
   }, [setUser, setProfile, setRole, setLoading])
 
-  const initializeRecaptcha = useCallback((containerId: string) => {
+  const initializeRecaptcha = useCallback(async (containerId: string): Promise<boolean> => {
     try {
-      initRecaptcha(containerId)
+      const success = await initRecaptcha(containerId)
+      return success
     } catch (err) {
       console.error('Recaptcha initialization error:', err)
+      return false
     }
   }, [])
 
@@ -118,13 +120,20 @@ export function useAuth(): UseAuthReturn {
       setLoading(true)
       setError(null)
 
+      // Validate Philippine phone number format (10 digits starting with 9)
+      const cleanPhone = phone.replace(/\D/g, '').replace(/^0/, '')
+      if (cleanPhone.length !== 10 || !cleanPhone.startsWith('9')) {
+        setError('Please enter a valid Philippine mobile number starting with 9')
+        return false
+      }
+
       // Check if reCAPTCHA is ready
       if (!isRecaptchaReady()) {
         setError('Security verification not ready. Please wait a moment and try again.')
         return false
       }
 
-      const result = await sendOTP(phone)
+      const result = await sendOTP(cleanPhone)
       setConfirmationResult(result)
       return true
     } catch (err) {

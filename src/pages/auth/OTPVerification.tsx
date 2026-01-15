@@ -24,6 +24,13 @@ export default function OTPVerification() {
     clearError,
   } = useAuth()
 
+  // Redirect to login if no phone in navigation state
+  useEffect(() => {
+    if (!location.state?.phone) {
+      navigate('/auth/login', { replace: true })
+    }
+  }, [location.state, navigate])
+
   // Redirect to return path after successful authentication
   useEffect(() => {
     if (isAuthenticated) {
@@ -31,9 +38,18 @@ export default function OTPVerification() {
     }
   }, [isAuthenticated, navigate, returnPath])
 
-  // Initialize recaptcha for resend
+  // Track if recaptcha is initialized for resend functionality
+  const [recaptchaReady, setRecaptchaReady] = useState(false)
+
+  // Initialize recaptcha for resend - only if not already initialized
   useEffect(() => {
-    initializeRecaptcha('recaptcha-container')
+    const initRecaptchaForResend = async () => {
+      // Small delay to let any existing reCAPTCHA settle
+      await new Promise(resolve => setTimeout(resolve, 200))
+      const success = await initializeRecaptcha('recaptcha-container')
+      setRecaptchaReady(success)
+    }
+    initRecaptchaForResend()
   }, [initializeRecaptcha])
 
   // Countdown timer for resend

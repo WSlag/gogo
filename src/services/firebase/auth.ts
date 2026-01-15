@@ -27,6 +27,7 @@ const logError = (message: string, error: unknown) => {
 // Recaptcha verifier instance
 let recaptchaVerifier: RecaptchaVerifier | null = null
 let recaptchaInitialized = false
+let currentContainerId: string | null = null
 
 // Store confirmation result at module level to persist across navigation
 let storedConfirmationResult: ConfirmationResult | null = null
@@ -42,18 +43,53 @@ export const clearStoredConfirmationResult = (): void => {
 }
 
 // Initialize recaptcha verifier
-export const initRecaptcha = (containerId: string): RecaptchaVerifier | null => {
+export const initRecaptcha = async (containerId: string): Promise<boolean> => {
   log('Initializing reCAPTCHA...', { containerId })
+
+  // If reCAPTCHA is already initialized for the same container, reuse it
+  if (recaptchaVerifier && recaptchaInitialized && currentContainerId === containerId) {
+    // Verify the container still exists in DOM
+    const container = document.getElementById(containerId)
+    if (container) {
+      log('reCAPTCHA already initialized, reusing existing instance')
+      return true
+    } else {
+      // Container was removed, need to reinitialize
+      log('reCAPTCHA container was removed, reinitializing...')
+      recaptchaVerifier = null
+      recaptchaInitialized = false
+      currentContainerId = null
+    }
+  }
+
+  // If switching containers, clear old verifier
+  if (currentContainerId && currentContainerId !== containerId) {
+    log('Switching reCAPTCHA containers, clearing old verifier')
+    try {
+      recaptchaVerifier?.clear()
+    } catch (e) {
+      log('Error clearing old reCAPTCHA (non-critical)', e)
+    }
+    recaptchaVerifier = null
+    recaptchaInitialized = false
+    currentContainerId = null
+  }
 
   // Check if container element exists
   const container = document.getElementById(containerId)
   if (!container) {
     logError('reCAPTCHA container not found', { containerId })
-    return null
+    return false
+  }
+
+  // Check if container already has reCAPTCHA rendered (has children)
+  if (container.hasChildNodes()) {
+    log('reCAPTCHA container already has content, clearing...')
+    container.innerHTML = ''
   }
 
   try {
-    // Clear existing verifier
+    // Clear existing verifier if any
     if (recaptchaVerifier) {
       log('Clearing existing reCAPTCHA verifier')
       try {
@@ -86,17 +122,32 @@ export const initRecaptcha = (containerId: string): RecaptchaVerifier | null => 
       },
     })
 
-    log('reCAPTCHA verifier created successfully')
-    return recaptchaVerifier
-  } catch (error) {
+    // Render the reCAPTCHA widget to ensure it's ready
+    await recaptchaVerifier.render()
+    recaptchaInitialized = true
+    currentContainerId = containerId
+    log('reCAPTCHA rendered successfully')
+    return true
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    // Handle the "already rendered" error gracefully
+    if (errorMessage.includes('already been rendered')) {
+      log('reCAPTCHA already rendered, marking as initialized')
+      recaptchaInitialized = true
+      currentContainerId = containerId
+      return true
+    }
     logError('Failed to initialize reCAPTCHA', error)
-    return null
+    recaptchaVerifier = null
+    recaptchaInitialized = false
+    currentContainerId = null
+    return false
   }
 }
 
 // Check if reCAPTCHA is ready
 export const isRecaptchaReady = (): boolean => {
-  return recaptchaVerifier !== null
+  return recaptchaVerifier !== null && recaptchaInitialized
 }
 
 // Send OTP to phone number
@@ -107,6 +158,18 @@ export const sendOTP = async (phoneNumber: string): Promise<ConfirmationResult> 
     const error = new Error('reCAPTCHA not initialized. Please refresh the page and try again.')
     logError('sendOTP failed', error)
     throw error
+  }
+
+  // Verify the reCAPTCHA container still exists
+  if (currentContainerId) {
+    const container = document.getElementById(currentContainerId)
+    if (!container) {
+      log('reCAPTCHA container was removed, clearing verifier')
+      recaptchaVerifier = null
+      recaptchaInitialized = false
+      currentContainerId = null
+      throw new Error('Security verification expired. Please refresh the page and try again.')
+    }
   }
 
   // Ensure phone number has country code (+63 for Philippines)
@@ -127,6 +190,20 @@ export const sendOTP = async (phoneNumber: string): Promise<ConfirmationResult> 
     const firebaseError = error as { code?: string; message?: string }
     logError('sendOTP failed', { code: firebaseError.code, message: firebaseError.message })
 
+    // If reCAPTCHA failed or was removed, clear it so it can be re-initialized
+    if (firebaseError.code === 'auth/captcha-check-failed' ||
+        firebaseError.code === 'auth/invalid-app-credential' ||
+        firebaseError.message?.includes('reCAPTCHA client element has been removed')) {
+      try {
+        recaptchaVerifier?.clear()
+      } catch (e) {
+        log('Error clearing failed reCAPTCHA', e)
+      }
+      recaptchaVerifier = null
+      recaptchaInitialized = false
+      currentContainerId = null
+    }
+
     // Map Firebase error codes to user-friendly messages
     const errorMessages: Record<string, string> = {
       'auth/invalid-phone-number': 'Invalid phone number format. Please enter a valid Philippine mobile number.',
@@ -136,6 +213,12 @@ export const sendOTP = async (phoneNumber: string): Promise<ConfirmationResult> 
       'auth/missing-phone-number': 'Please enter your phone number.',
       'auth/operation-not-allowed': 'Phone authentication is not enabled. Please contact support.',
       'auth/network-request-failed': 'Network error. Please check your internet connection.',
+      'auth/invalid-app-credential': 'Security verification failed. Please refresh the page and try again.',
+    }
+
+    // Handle reCAPTCHA element removed error
+    if (firebaseError.message?.includes('reCAPTCHA client element has been removed')) {
+      throw new Error('Security verification expired. Please refresh the page and try again.')
     }
 
     const userMessage = errorMessages[firebaseError.code || ''] || firebaseError.message || 'Failed to send verification code. Please try again.'

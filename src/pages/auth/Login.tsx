@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Phone, ArrowRight, AlertCircle } from 'lucide-react'
-import { Button, Card, PhoneInput } from '@/components/ui'
+import { AlertCircle, Phone, ArrowLeft } from 'lucide-react'
+import { Button, PhoneInput } from '@/components/ui'
 import { useAuth } from '@/hooks'
 import { APP_CONFIG } from '@/config/app'
 
@@ -14,15 +14,16 @@ interface LocationState {
 export default function Login() {
   const navigate = useNavigate()
   const location = useLocation()
-  const [phone, setPhone] = useState('')
+  const [authMode, setAuthMode] = useState<'choose' | 'phone'>('choose')
+  const [phoneNumber, setPhoneNumber] = useState('')
+
   const {
     isAuthenticated,
     isLoading,
     error,
-    initializeRecaptcha,
-    sendVerificationCode,
     loginWithGoogle,
-    loginWithFacebook,
+    sendVerificationCode,
+    initializeRecaptcha,
     clearError,
   } = useAuth()
 
@@ -36,13 +37,6 @@ export default function Login() {
     }
   }, [navigate])
 
-  // Initialize recaptcha on mount
-  useEffect(() => {
-    if (!APP_CONFIG.SKIP_AUTH) {
-      initializeRecaptcha('recaptcha-container')
-    }
-  }, [initializeRecaptcha])
-
   // Redirect if already authenticated - go back to original page
   useEffect(() => {
     if (isAuthenticated) {
@@ -50,41 +44,65 @@ export default function Login() {
     }
   }, [isAuthenticated, navigate, from])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!phone || phone.length < 10) return
+  // Initialize reCAPTCHA when phone mode is active (only once)
+  const [recaptchaInitialized, setRecaptchaInitialized] = useState(false)
 
-    clearError()
-    const success = await sendVerificationCode(phone)
-
-    if (success) {
-      navigate('/auth/otp', { state: { phone: `+63${phone}`, from } })
+  useEffect(() => {
+    if (authMode === 'phone' && !recaptchaInitialized) {
+      const timer = setTimeout(async () => {
+        const success = await initializeRecaptcha('recaptcha-container-login')
+        if (success) {
+          setRecaptchaInitialized(true)
+        }
+      }, 100)
+      return () => clearTimeout(timer)
     }
-  }
+  }, [authMode, initializeRecaptcha, recaptchaInitialized])
 
   const handleGoogleSignIn = async () => {
     clearError()
     await loginWithGoogle()
   }
 
-  const handleFacebookSignIn = async () => {
+  const handlePhoneSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
     clearError()
-    await loginWithFacebook()
+
+    // Validate phone number (10 digits, starts with 9)
+    const cleanPhone = phoneNumber.replace(/\D/g, '').replace(/^0/, '')
+    if (cleanPhone.length !== 10 || !cleanPhone.startsWith('9')) {
+      return
+    }
+
+    const success = await sendVerificationCode(cleanPhone)
+    if (success) {
+      navigate('/auth/otp', {
+        state: {
+          phone: `+63${cleanPhone}`,
+          from,
+        },
+      })
+    }
+  }
+
+  const handleBackToChoose = () => {
+    setAuthMode('choose')
+    setPhoneNumber('')
+    clearError()
   }
 
   return (
     <div className="flex min-h-screen flex-col bg-white">
-      {/* Recaptcha container (invisible) */}
-      <div id="recaptcha-container"></div>
-
       {/* Header */}
       <div className="flex-1 px-6 pt-12 lg:flex lg:flex-col lg:items-center lg:justify-center lg:pt-0">
         <div className="lg:w-full lg:max-w-md">
           {/* Logo */}
           <div className="mb-8 flex justify-center">
-            <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-primary-600 text-3xl font-bold text-white">
-              G
-            </div>
+            <img
+              src="/icons/logo.jpg"
+              alt="GOGO Express"
+              className="h-24 w-auto rounded-2xl"
+            />
           </div>
 
           {/* Welcome Text */}
@@ -95,6 +113,9 @@ export default function Login() {
             </p>
           </div>
 
+          {/* reCAPTCHA container (invisible) */}
+          <div id="recaptcha-container-login"></div>
+
           {/* Error Message */}
           {error && (
             <div className="mb-4 flex items-center gap-2 rounded-lg bg-error-light p-3 text-sm text-error">
@@ -103,75 +124,77 @@ export default function Login() {
             </div>
           )}
 
-          {/* Phone Input Form */}
-          <Card variant="flat" className="bg-gray-50">
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
-                  Enter your mobile number
-                </label>
-                <PhoneInput
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
-                  inputSize="lg"
-                  leftIcon={<Phone className="h-5 w-5" />}
-                  disabled={isLoading}
-                />
-                <p className="mt-2 text-xs text-gray-500">
-                  We'll send you a verification code via SMS
-                </p>
+          {authMode === 'choose' ? (
+            <>
+              {/* Phone Sign In */}
+              <Button
+                variant="primary"
+                size="lg"
+                fullWidth
+                onClick={() => setAuthMode('phone')}
+                disabled={isLoading}
+              >
+                <Phone className="h-5 w-5" />
+                Continue with Phone
+              </Button>
+
+              {/* Divider */}
+              <div className="my-6 flex items-center gap-4">
+                <div className="h-px flex-1 bg-gray-200" />
+                <span className="text-sm text-gray-500">or</span>
+                <div className="h-px flex-1 bg-gray-200" />
               </div>
 
+              {/* Google Sign In */}
+              <Button
+                variant="outline"
+                size="lg"
+                fullWidth
+                onClick={handleGoogleSignIn}
+                disabled={isLoading}
+              >
+                <img
+                  src="https://www.google.com/favicon.ico"
+                  alt="Google"
+                  className="h-5 w-5"
+                />
+                Continue with Google
+              </Button>
+            </>
+          ) : (
+            <form onSubmit={handlePhoneSubmit} className="space-y-6">
+              {/* Back button */}
+              <button
+                type="button"
+                onClick={handleBackToChoose}
+                className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back
+              </button>
+
+              {/* Phone Input */}
+              <PhoneInput
+                label="Mobile Number"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
+                placeholder="9XX XXX XXXX"
+                disabled={isLoading}
+                autoFocus
+              />
+
+              {/* Submit Button */}
               <Button
                 type="submit"
                 size="lg"
                 fullWidth
                 isLoading={isLoading}
-                disabled={phone.length < 10 || isLoading}
-                rightIcon={<ArrowRight className="h-5 w-5" />}
+                disabled={isLoading || phoneNumber.replace(/\D/g, '').length < 10}
               >
-                Continue
+                Send Verification Code
               </Button>
             </form>
-          </Card>
-
-          {/* Divider */}
-          <div className="my-6 flex items-center gap-4">
-            <div className="h-px flex-1 bg-gray-200" />
-            <span className="text-sm text-gray-500">or continue with</span>
-            <div className="h-px flex-1 bg-gray-200" />
-          </div>
-
-          {/* Social Login */}
-          <div className="space-y-3">
-            <Button
-              variant="outline"
-              size="lg"
-              fullWidth
-              onClick={handleGoogleSignIn}
-              disabled={isLoading}
-            >
-              <img
-                src="https://www.google.com/favicon.ico"
-                alt="Google"
-                className="h-5 w-5"
-              />
-              Continue with Google
-            </Button>
-
-            <Button
-              variant="outline"
-              size="lg"
-              fullWidth
-              onClick={handleFacebookSignIn}
-              disabled={isLoading}
-            >
-              <svg className="h-5 w-5 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-              </svg>
-              Continue with Facebook
-            </Button>
-          </div>
+          )}
         </div>
       </div>
 

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -9,19 +9,31 @@ import {
   Check,
 } from 'lucide-react'
 import { Card, Button } from '@/components/ui'
+import { useAuth } from '@/hooks/useAuth'
 
 export default function EditProfile() {
   const navigate = useNavigate()
+  const { profile, user: firebaseUser, updateUserProfile } = useAuth()
   const [isSaving, setIsSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
-  // Mock user data - in production, this would come from auth context/store
+  // Use actual user data from auth context
   const [formData, setFormData] = useState({
-    firstName: 'Juan',
-    lastName: 'Dela Cruz',
-    phone: '+63 917 123 4567',
-    email: 'juan@email.com',
+    firstName: '',
+    lastName: '',
+    phone: '',
+    email: '',
   })
+
+  // Initialize form data from profile when it loads
+  useEffect(() => {
+    setFormData({
+      firstName: profile?.firstName || '',
+      lastName: profile?.lastName || '',
+      phone: profile?.phone || firebaseUser?.phoneNumber || '',
+      email: profile?.email || firebaseUser?.email || '',
+    })
+  }, [profile, firebaseUser])
 
   const handleInputChange = (field: keyof typeof formData, value: string) => {
     setFormData((prev) => ({
@@ -32,11 +44,20 @@ export default function EditProfile() {
 
   const handleSave = async () => {
     setIsSaving(true)
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    setIsSaving(false)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+    try {
+      await updateUserProfile({
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        // Note: phone number changes require re-verification
+      })
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch (error) {
+      console.error('Failed to save profile:', error)
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
@@ -78,7 +99,7 @@ export default function EditProfile() {
           <div className="flex flex-col items-center py-4">
             <div className="relative">
               <div className="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-primary-500 to-primary-600 text-3xl font-bold text-white">
-                {formData.firstName[0]}{formData.lastName[0]}
+                {formData.firstName?.[0] || 'U'}{formData.lastName?.[0] || ''}
               </div>
               <button className="absolute bottom-0 right-0 flex h-8 w-8 items-center justify-center rounded-full bg-primary-600 text-white shadow-lg hover:bg-primary-700 transition-colors">
                 <Camera className="h-4 w-4" />
