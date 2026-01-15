@@ -270,14 +270,28 @@ export const verifyOTP = async (
   }
 }
 
+// Track if Google sign-in popup is in progress to prevent duplicate requests
+let googleSignInInProgress = false
+
 // Google Sign-In
 export const signInWithGoogle = async (): Promise<User> => {
-  const provider = new GoogleAuthProvider()
-  provider.addScope('email')
-  provider.addScope('profile')
+  // Prevent multiple concurrent popup requests
+  if (googleSignInInProgress) {
+    throw new Error('Sign-in already in progress')
+  }
 
-  const result = await signInWithPopup(auth, provider)
-  return result.user
+  googleSignInInProgress = true
+
+  try {
+    const provider = new GoogleAuthProvider()
+    provider.addScope('email')
+    provider.addScope('profile')
+
+    const result = await signInWithPopup(auth, provider)
+    return result.user
+  } finally {
+    googleSignInInProgress = false
+  }
 }
 
 // Facebook Sign-In
