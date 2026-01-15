@@ -48,7 +48,7 @@ const supportMenuItems: MenuItem[] = [
 
 export default function Profile() {
   const navigate = useNavigate()
-  const { logout, profile, user: firebaseUser } = useAuth()
+  const { logout, profile, user: firebaseUser, role } = useAuth()
   const [copied, setCopied] = useState(false)
 
   // Use actual user data from auth context with fallbacks
@@ -199,7 +199,7 @@ export default function Profile() {
           <div className="grid grid-cols-2 gap-3">
             {/* Driver Mode Card */}
             <button
-              onClick={() => navigate('/driver')}
+              onClick={() => navigate(role === 'driver' || role === 'admin' ? '/driver' : '/driver/register')}
               className="group rounded-xl bg-gradient-to-br from-primary-600 to-primary-700 p-3.5 text-left text-white shadow-sm hover:shadow-md active:scale-[0.98] transition-all"
             >
               <div className="flex items-center gap-3">
