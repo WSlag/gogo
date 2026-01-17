@@ -234,43 +234,37 @@ export default function Profile() {
                 <p className="text-xs text-gray-500 leading-tight">Share GOGO Express with friends and family</p>
               </div>
               <button
-                onClick={async () => {
+                onClick={() => {
                   const shareUrl = 'https://gogoph-app.web.app'
-                  const shareData = {
-                    title: 'GOGO Express',
-                    text: 'Check out GOGO Express - Your all-in-one delivery and ride app!',
-                    url: shareUrl
-                  }
+                  const shareText = 'Check out GOGO Express - Your all-in-one delivery and ride app! ' + shareUrl
 
                   // Try Web Share API first (mobile)
-                  if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
-                    try {
-                      await navigator.share(shareData)
-                    } catch (err) {
-                      // User cancelled or error - fall back to clipboard
-                      if ((err as Error).name !== 'AbortError') {
-                        await navigator.clipboard.writeText(shareUrl)
-                        setCopied(true)
-                        setTimeout(() => setCopied(false), 2000)
-                      }
-                    }
+                  if (typeof navigator.share === 'function') {
+                    navigator.share({
+                      title: 'GOGO Express',
+                      text: 'Check out GOGO Express - Your all-in-one delivery and ride app!',
+                      url: shareUrl
+                    }).catch(() => {
+                      // If share fails or is cancelled, do nothing
+                    })
                   } else {
-                    // Fallback: copy to clipboard
+                    // Fallback: copy to clipboard using execCommand (most compatible)
+                    const textArea = document.createElement('textarea')
+                    textArea.value = shareText
+                    textArea.style.position = 'fixed'
+                    textArea.style.left = '-9999px'
+                    textArea.style.top = '0'
+                    document.body.appendChild(textArea)
+                    textArea.focus()
+                    textArea.select()
                     try {
-                      await navigator.clipboard.writeText(shareUrl)
-                      setCopied(true)
-                      setTimeout(() => setCopied(false), 2000)
-                    } catch {
-                      // Final fallback for older browsers
-                      const textArea = document.createElement('textarea')
-                      textArea.value = shareUrl
-                      document.body.appendChild(textArea)
-                      textArea.select()
                       document.execCommand('copy')
-                      document.body.removeChild(textArea)
                       setCopied(true)
                       setTimeout(() => setCopied(false), 2000)
+                    } catch (e) {
+                      console.error('Copy failed:', e)
                     }
+                    document.body.removeChild(textArea)
                   }
                 }}
                 className="flex items-center justify-center gap-2 bg-primary-600 text-white rounded-lg px-4 py-2.5 text-sm font-semibold hover:bg-primary-700 active:scale-[0.98] transition-all shrink-0"
