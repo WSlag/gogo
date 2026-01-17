@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Star, Clock } from 'lucide-react'
 import RideBookingCard from '@/components/rides/RideBookingCard'
@@ -11,6 +11,7 @@ import { PromoCarousel } from '@/components/home/PromoCarousel'
 import { TrendingSection } from '@/components/home/TrendingSection'
 import { RecentRides } from '@/components/rides/RecentRides'
 import { useAuthStore } from '@/store/authStore'
+import { OnboardingDialog } from '@/components/onboarding/OnboardingDialog'
 
 // Restaurant data with enhanced fields
 const featuredRestaurants = [
@@ -108,7 +109,21 @@ export default function Home() {
   const navigate = useNavigate()
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [showOnboarding, setShowOnboarding] = useState(false)
   const { profile, isAuthenticated } = useAuthStore()
+
+  // Show onboarding dialog for new users
+  useEffect(() => {
+    const hasSeenOnboarding = localStorage.getItem('gogo-onboarding-seen')
+    if (isAuthenticated && profile && !hasSeenOnboarding) {
+      setShowOnboarding(true)
+    }
+  }, [isAuthenticated, profile])
+
+  const handleOnboardingClose = () => {
+    localStorage.setItem('gogo-onboarding-seen', 'true')
+    setShowOnboarding(false)
+  }
 
   // Get user's first name from profile, or use generic greeting when not authenticated
   const userName = isAuthenticated && profile?.firstName ? profile.firstName : 'there'
@@ -241,6 +256,12 @@ export default function Home() {
 
         </div>
       </main>
+
+      {/* Onboarding Dialog for new users */}
+      <OnboardingDialog
+        isOpen={showOnboarding}
+        onClose={handleOnboardingClose}
+      />
     </div>
   )
 }
