@@ -16,8 +16,6 @@ import {
   Car,
   Gift,
   Crown,
-  Copy,
-  Check,
   Camera,
   Sparkles,
 } from 'lucide-react'
@@ -64,19 +62,12 @@ export default function Profile() {
     totalRides: profile?.stats?.totalRides || 0,
     rating: profile?.stats?.rating || 5.0,
     membershipTier: profile?.membershipTier || 'Bronze',
-    referralCode: profile?.referralCode || ('GOGO' + (firebaseUser?.uid?.slice(0, 6).toUpperCase() || 'NEW')),
     walletBalance: profile?.walletBalance || 0,
     loyaltyPoints: profile?.loyaltyPoints || 0,
   }
 
   const handleLogout = async () => {
     await logout()
-  }
-
-  const copyReferralCode = () => {
-    navigator.clipboard.writeText(user.referralCode)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
   }
 
   // Calculate membership progress (mock)
@@ -232,43 +223,37 @@ export default function Profile() {
             </button>
           </div>
 
-          {/* Referral Card */}
+          {/* Invite Friends Card */}
           <div className="bg-gradient-to-br from-primary-50 to-primary-100/50 rounded-xl p-4 border border-primary-200 shadow-sm">
-            <div className="flex items-center gap-3 mb-3">
+            <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-600 shrink-0">
                 <Gift className="h-5 w-5 text-white" />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="font-bold text-base leading-tight text-gray-900">Invite Friends, Earn P100</h3>
-                <p className="text-xs text-gray-500 leading-tight">Share your code and both get rewards!</p>
-              </div>
-            </div>
-
-            {/* Referral Code */}
-            <div className="flex items-center gap-2">
-              <div className="flex-1 flex items-center gap-2 bg-white rounded-lg px-3 py-2.5 border border-primary-200">
-                <span className="text-xs text-gray-500">Your code:</span>
-                <span className="font-mono font-bold text-base tracking-wider text-primary-700">{user.referralCode}</span>
+                <h3 className="font-bold text-base leading-tight text-gray-900">Invite Friends</h3>
+                <p className="text-xs text-gray-500 leading-tight">Share GOGO Express with friends and family</p>
               </div>
               <button
-                onClick={copyReferralCode}
-                className="flex h-10 w-10 items-center justify-center rounded-lg bg-white border border-primary-200 hover:bg-primary-50 active:scale-95 transition-all shrink-0"
+                onClick={() => {
+                  const shareData = {
+                    title: 'GOGO Express',
+                    text: 'Check out GOGO Express - Your all-in-one delivery and ride app!',
+                    url: 'https://gogoph-app.web.app'
+                  }
+                  if (navigator.share) {
+                    navigator.share(shareData)
+                  } else {
+                    navigator.clipboard.writeText(shareData.url)
+                    setCopied(true)
+                    setTimeout(() => setCopied(false), 2000)
+                  }
+                }}
+                className="flex items-center justify-center gap-2 bg-primary-600 text-white rounded-lg px-4 py-2.5 text-sm font-semibold hover:bg-primary-700 active:scale-[0.98] transition-all shrink-0"
               >
-                {copied ? (
-                  <Check className="h-4 w-4 text-primary-600" />
-                ) : (
-                  <Copy className="h-4 w-4 text-gray-500" />
-                )}
+                <Share2 className="h-4 w-4" />
+                {copied ? 'Copied!' : 'Share'}
               </button>
             </div>
-
-            <button
-              onClick={() => navigate('/referral')}
-              className="mt-3 w-full flex items-center justify-center gap-2 bg-primary-600 text-white rounded-lg py-2.5 text-sm font-semibold hover:bg-primary-700 active:scale-[0.98] transition-all"
-            >
-              <Share2 className="h-4 w-4" />
-              Share & Earn
-            </button>
           </div>
 
           {/* Account Settings */}
