@@ -234,18 +234,43 @@ export default function Profile() {
                 <p className="text-xs text-gray-500 leading-tight">Share GOGO Express with friends and family</p>
               </div>
               <button
-                onClick={() => {
+                onClick={async () => {
+                  const shareUrl = 'https://gogoph-app.web.app'
                   const shareData = {
                     title: 'GOGO Express',
                     text: 'Check out GOGO Express - Your all-in-one delivery and ride app!',
-                    url: 'https://gogoph-app.web.app'
+                    url: shareUrl
                   }
-                  if (navigator.share) {
-                    navigator.share(shareData)
+
+                  // Try Web Share API first (mobile)
+                  if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+                    try {
+                      await navigator.share(shareData)
+                    } catch (err) {
+                      // User cancelled or error - fall back to clipboard
+                      if ((err as Error).name !== 'AbortError') {
+                        await navigator.clipboard.writeText(shareUrl)
+                        setCopied(true)
+                        setTimeout(() => setCopied(false), 2000)
+                      }
+                    }
                   } else {
-                    navigator.clipboard.writeText(shareData.url)
-                    setCopied(true)
-                    setTimeout(() => setCopied(false), 2000)
+                    // Fallback: copy to clipboard
+                    try {
+                      await navigator.clipboard.writeText(shareUrl)
+                      setCopied(true)
+                      setTimeout(() => setCopied(false), 2000)
+                    } catch {
+                      // Final fallback for older browsers
+                      const textArea = document.createElement('textarea')
+                      textArea.value = shareUrl
+                      document.body.appendChild(textArea)
+                      textArea.select()
+                      document.execCommand('copy')
+                      document.body.removeChild(textArea)
+                      setCopied(true)
+                      setTimeout(() => setCopied(false), 2000)
+                    }
                   }
                 }}
                 className="flex items-center justify-center gap-2 bg-primary-600 text-white rounded-lg px-4 py-2.5 text-sm font-semibold hover:bg-primary-700 active:scale-[0.98] transition-all shrink-0"
