@@ -14,7 +14,7 @@ import {
 } from 'lucide-react'
 import { Button, Card, Input, Spinner } from '@/components/ui'
 import { useAuthStore } from '@/store/authStore'
-import { useMerchantImageUpload } from '@/hooks/useImageUpload'
+import { useImageUpload } from '@/hooks/useImageUpload'
 import { collection, doc, setDoc, Timestamp } from 'firebase/firestore'
 import { db } from '@/services/firebase/config'
 import type { MerchantType } from '@/types'
@@ -53,7 +53,8 @@ const BUSINESS_TYPES: { type: MerchantType; label: string; description: string }
 export default function MerchantRegistration() {
   const navigate = useNavigate()
   const { user } = useAuthStore()
-  const { uploadImage, uploading } = useMerchantImageUpload()
+  const { uploadImage, uploadState } = useImageUpload()
+  const uploading = uploadState.status === 'uploading'
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [currentStep, setCurrentStep] = useState<Step>('owner')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -117,10 +118,12 @@ export default function MerchantRegistration() {
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (!file || !currentUploadField) return
+    if (!file || !currentUploadField || !user) return
 
     try {
-      const url = await uploadImage(file)
+      // Use merchant-applications path with user.uid since merchant doesn't exist yet
+      const path = `merchant-applications/${user.uid}/${currentUploadField}.jpg`
+      const url = await uploadImage(file, path)
       if (currentUploadField === 'logo') {
         setBusinessInfo((prev) => ({ ...prev, logo: url }))
       } else {

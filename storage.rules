@@ -18,24 +18,45 @@ service firebase.storage {
       return request.resource.size < 5 * 1024 * 1024;
     }
 
-    // Profile images
+    // Profile images (legacy path)
     match /profile-images/{userId} {
       allow read: if true;
       allow write: if isOwner(userId) && isImageFile() && isUnder5MB();
       allow delete: if isOwner(userId);
     }
 
-    // Driver documents
+    // User images (profile and general uploads)
+    match /users/{userId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if isOwner(userId) && isImageFile() && isUnder5MB();
+      allow delete: if isOwner(userId);
+    }
+
+    // Driver documents (legacy path)
     match /driver-documents/{driverId}/{document} {
       allow read: if isOwner(driverId);
       allow write: if isOwner(driverId) && isUnder5MB();
       allow delete: if isOwner(driverId);
     }
 
-    // Merchant assets
-    match /merchants/{merchantId}/{asset} {
+    // Driver documents and vehicle photos (new path used by code)
+    match /drivers/{driverId}/{allPaths=**} {
+      allow read: if isOwner(driverId);
+      allow write: if isOwner(driverId) && isUnder5MB();
+      allow delete: if isOwner(driverId);
+    }
+
+    // Merchant documents during registration (before merchant ID exists)
+    match /merchant-applications/{userId}/{allPaths=**} {
+      allow read: if isOwner(userId);
+      allow write: if isOwner(userId) && isImageFile() && isUnder5MB();
+      allow delete: if isOwner(userId);
+    }
+
+    // Merchant assets (logo, banner, products after approval)
+    match /merchants/{merchantId}/{allPaths=**} {
       allow read: if true;
-      allow write: if false; // Only admin can upload
+      allow write: if isOwner(merchantId) && isImageFile() && isUnder5MB();
     }
 
     // Product images
