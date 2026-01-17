@@ -198,16 +198,16 @@ export default function Profile() {
                   <Car className="h-4.5 w-4.5" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-sm leading-tight">Driver Mode</h3>
+                  <h3 className="font-semibold text-sm leading-tight">Register as Driver</h3>
                   <p className="text-[11px] text-white/70 leading-tight">Start earning today</p>
                 </div>
                 <ChevronRight className="h-4 w-4 text-white/50 shrink-0" />
               </div>
             </button>
 
-            {/* Wallet Card */}
+            {/* Merchant Registration Card */}
             <button
-              onClick={() => navigate('/wallet')}
+              onClick={() => navigate('/merchant/register')}
               className="group rounded-xl bg-white border-2 border-gray-200 p-3.5 text-left shadow-sm hover:border-primary-300 hover:shadow-md active:scale-[0.98] transition-all"
             >
               <div className="flex items-center gap-3">
@@ -215,8 +215,8 @@ export default function Profile() {
                   <Wallet className="h-4.5 w-4.5 text-primary-600" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-sm leading-tight text-gray-900">GOGO Express Wallet</h3>
-                  <p className="text-[11px] text-gray-500 leading-tight">Top up & pay easily</p>
+                  <h3 className="font-semibold text-sm leading-tight text-gray-900">Register as Merchant</h3>
+                  <p className="text-[11px] text-gray-500 leading-tight">Start earning today</p>
                 </div>
                 <ChevronRight className="h-4 w-4 text-gray-400 shrink-0" />
               </div>
