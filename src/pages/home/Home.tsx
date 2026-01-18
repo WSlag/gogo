@@ -254,6 +254,38 @@ export default function Home() {
             )}
           </section>
 
+          {/* End of Feed Footer */}
+          <section className="pt-8 pb-4 border-t border-gray-200 mt-8">
+            <div className="text-center">
+              {/* End of feed indicator */}
+              <div className="flex items-center justify-center gap-2 text-gray-400 mb-4">
+                <div className="h-px w-12 bg-gray-200" />
+                <span className="text-sm">You're all caught up</span>
+                <div className="h-px w-12 bg-gray-200" />
+              </div>
+
+              {/* CTA Button */}
+              <button
+                onClick={() => navigate('/food')}
+                className="text-primary-600 font-semibold text-sm hover:text-primary-700"
+              >
+                Browse all restaurants
+              </button>
+
+              {/* Quick links */}
+              <div className="flex justify-center gap-6 mt-6 text-xs text-gray-400">
+                <button onClick={() => navigate('/account')} className="hover:text-gray-600">Help</button>
+                <a href="#" className="hover:text-gray-600">Terms</a>
+                <a href="#" className="hover:text-gray-600">Privacy</a>
+              </div>
+
+              {/* Branding */}
+              <p className="mt-4 text-xs text-gray-300">
+                GOGO Express
+              </p>
+            </div>
+          </section>
+
         </div>
       </main>
 

@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
+import { useMerchantApplication } from '@/hooks/useMerchantApplication'
 import {
   User,
   MapPin,
@@ -18,6 +19,9 @@ import {
   Crown,
   Camera,
   Sparkles,
+  Store,
+  Clock,
+  XCircle,
 } from 'lucide-react'
 
 interface MenuItem {
@@ -47,6 +51,7 @@ const supportMenuItems: MenuItem[] = [
 export default function Profile() {
   const navigate = useNavigate()
   const { logout, profile, user: firebaseUser, role } = useAuth()
+  const { applicationStatus, merchantData } = useMerchantApplication()
   const [copied, setCopied] = useState(false)
 
   // Use actual user data from auth context with fallbacks
@@ -205,22 +210,74 @@ export default function Profile() {
               </div>
             </button>
 
-            {/* Merchant Registration Card */}
-            <button
-              onClick={() => navigate('/merchant/register')}
-              className="group rounded-xl bg-white border-2 border-gray-200 p-3.5 text-left shadow-sm hover:border-primary-300 hover:shadow-md active:scale-[0.98] transition-all"
-            >
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-100 shrink-0">
-                  <Wallet className="h-4.5 w-4.5 text-primary-600" />
+            {/* Merchant Card - Conditional based on application status */}
+            {applicationStatus === 'approved' ? (
+              // Approved - Show Merchant Dashboard button
+              <button
+                onClick={() => navigate('/merchant')}
+                className="group rounded-xl bg-gradient-to-br from-green-600 to-green-700 p-3.5 text-left text-white shadow-sm hover:shadow-md active:scale-[0.98] transition-all"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/20 shrink-0">
+                    <Store className="h-4.5 w-4.5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-sm leading-tight">Merchant Dashboard</h3>
+                    <p className="text-[11px] text-white/70 leading-tight truncate">
+                      {merchantData?.businessName || 'Manage your store'}
+                    </p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-white/50 shrink-0" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-sm leading-tight text-gray-900">Register as Merchant</h3>
-                  <p className="text-[11px] text-gray-500 leading-tight">Start earning today</p>
+              </button>
+            ) : applicationStatus === 'pending' ? (
+              // Pending - Show Application Pending status
+              <div className="rounded-xl bg-amber-50 border-2 border-amber-200 p-3.5">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-100 shrink-0">
+                    <Clock className="h-4.5 w-4.5 text-amber-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-sm leading-tight text-amber-800">Application Pending</h3>
+                    <p className="text-[11px] text-amber-600 leading-tight">Under review (3-5 days)</p>
+                  </div>
                 </div>
-                <ChevronRight className="h-4 w-4 text-gray-400 shrink-0" />
               </div>
-            </button>
+            ) : applicationStatus === 'rejected' ? (
+              // Rejected - Show Rejected status with reapply option
+              <button
+                onClick={() => navigate('/merchant/register')}
+                className="group rounded-xl bg-red-50 border-2 border-red-200 p-3.5 text-left hover:border-red-300 active:scale-[0.98] transition-all"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-100 shrink-0">
+                    <XCircle className="h-4.5 w-4.5 text-red-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-sm leading-tight text-red-800">Application Rejected</h3>
+                    <p className="text-[11px] text-red-600 leading-tight">Tap to reapply</p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-red-400 shrink-0" />
+                </div>
+              </button>
+            ) : (
+              // No application - Show Register as Merchant button
+              <button
+                onClick={() => navigate('/merchant/register')}
+                className="group rounded-xl bg-white border-2 border-gray-200 p-3.5 text-left shadow-sm hover:border-primary-300 hover:shadow-md active:scale-[0.98] transition-all"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-100 shrink-0">
+                    <Store className="h-4.5 w-4.5 text-primary-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-sm leading-tight text-gray-900">Register as Merchant</h3>
+                    <p className="text-[11px] text-gray-500 leading-tight">Start earning today</p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-gray-400 shrink-0" />
+                </div>
+              </button>
+            )}
           </div>
 
           {/* Invite Friends Card */}

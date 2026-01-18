@@ -61,6 +61,14 @@ service cloud.firestore {
         (resource.data.role == null || resource.data.role == 'customer')
       ) || isAdmin();
       allow delete: if isAdmin();
+
+      // User notifications subcollection
+      match /notifications/{notificationId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create: if isAdmin();
+        allow update: if isOwner(userId) || isAdmin();
+        allow delete: if isOwner(userId) || isAdmin();
+      }
     }
 
     // Drivers collection
