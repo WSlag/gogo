@@ -49,6 +49,15 @@ service cloud.firestore {
       return isAuthenticated() && getUserRole() in roles;
     }
 
+    // Check if the authenticated user owns the merchant (by userId field or phone number)
+    function isMerchantOwner(merchantId) {
+      let merchant = get(/databases/$(database)/documents/merchants/$(merchantId)).data;
+      return merchant != null && (
+        merchant.userId == request.auth.uid ||
+        merchant.userId == request.auth.token.phone_number
+      );
+    }
+
     // Users collection
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
@@ -83,7 +92,12 @@ service cloud.firestore {
     match /merchants/{merchantId} {
       allow read: if true;
       allow create: if isAuthenticated();
-      allow update: if resource.data.ownerId == request.auth.uid || isAdmin();
+      allow update: if isAuthenticated() && (
+        resource.data.ownerId == request.auth.uid ||
+        resource.data.userId == request.auth.uid ||
+        resource.data.userId == request.auth.token.phone_number ||
+        isAdmin()
+      );
       allow delete: if isAdmin();
     }
 
@@ -112,10 +126,14 @@ service cloud.firestore {
     }
 
     // Orders collection
+    // Note: merchantUserId is stored in orders for permission checking without get() calls
+    // This allows queries to work properly (isMerchantOwner with get() fails in query context)
     match /orders/{orderId} {
       allow read: if isAuthenticated() && (
         resource.data.customerId == request.auth.uid ||
         resource.data.merchantId == request.auth.uid ||
+        resource.data.merchantUserId == request.auth.uid ||
+        resource.data.merchantUserId == request.auth.token.phone_number ||
         resource.data.driverId == request.auth.uid ||
         isAdmin()
       );
@@ -123,6 +141,8 @@ service cloud.firestore {
       allow update: if isAuthenticated() && (
         resource.data.customerId == request.auth.uid ||
         resource.data.merchantId == request.auth.uid ||
+        resource.data.merchantUserId == request.auth.uid ||
+        resource.data.merchantUserId == request.auth.token.phone_number ||
         resource.data.driverId == request.auth.uid ||
         isAdmin()
       );

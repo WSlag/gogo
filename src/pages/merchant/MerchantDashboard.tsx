@@ -13,30 +13,38 @@ import {
   Package,
   AlertCircle,
   Phone,
+  Store,
 } from 'lucide-react'
 import { PesoSign } from '@/components/icons'
 import { Button, Card, Spinner, Modal } from '@/components/ui'
 import { useMerchantOrders } from '@/hooks/useMerchantOrders'
 import { useMerchantDetail } from '@/hooks/useMerchants'
+import { useMerchantApplication } from '@/hooks/useMerchantApplication'
 import { setDocument, collections, serverTimestamp } from '@/services/firebase/firestore'
 import type { Order } from '@/types'
 
-// Default test merchant ID - can be overridden via URL param ?merchant=xxx
-const DEFAULT_MERCHANT_ID = 'merchant-005'
+// Placeholder image for merchants without logos (data URL SVG - works offline)
+const PLACEHOLDER_IMAGE = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Crect fill="%23e5e7eb" width="100" height="100" rx="50"/%3E%3Ctext x="50" y="55" font-size="32" fill="%239ca3af" text-anchor="middle"%3E🏪%3C/text%3E%3C/svg%3E'
 
 export default function MerchantDashboard() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
 
-  // Allow merchant ID override via URL param for testing
-  const TEST_MERCHANT_ID = searchParams.get('merchant') || DEFAULT_MERCHANT_ID
+  // Get the user's actual merchant ID from their application
+  const { merchantData, isLoading: applicationLoading } = useMerchantApplication()
+
+  // Allow merchant ID override via URL param for testing/admin
+  const urlMerchantId = searchParams.get('merchant')
+  const merchantId = urlMerchantId || merchantData?.id || ''
+
   const [isToggling, setIsToggling] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
 
   // Fetch merchant details
-  const { merchant, isLoading: merchantLoading } = useMerchantDetail(TEST_MERCHANT_ID)
+  const { merchant, isLoading: merchantLoading } = useMerchantDetail(merchantId)
 
   // Fetch orders with real-time updates
+  // Use merchantUserId for querying to comply with Firestore security rules
   const {
     orders,
     pendingCount,
@@ -46,7 +54,8 @@ export default function MerchantDashboard() {
     startPreparing,
     markReady,
   } = useMerchantOrders({
-    merchantId: TEST_MERCHANT_ID,
+    merchantId: merchantId,
+    merchantUserId: merchantData?.userId,
     realtime: true,
   })
 
@@ -68,10 +77,10 @@ export default function MerchantDashboard() {
   const activeOrders = orders.filter(o => ['confirmed', 'preparing'].includes(o.status))
 
   const toggleAcceptingOrders = async () => {
-    if (!merchant) return
+    if (!merchant || !merchantId) return
     setIsToggling(true)
     try {
-      await setDocument(collections.merchants, TEST_MERCHANT_ID, {
+      await setDocument(collections.merchants, merchantId, {
         isOpen: !merchant.isOpen,
         updatedAt: serverTimestamp(),
       })
@@ -117,7 +126,37 @@ export default function MerchantDashboard() {
     return date.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })
   }
 
-  const isLoading = merchantLoading || ordersLoading
+  const isLoading = applicationLoading || merchantLoading || ordersLoading
+
+  // Show loading while fetching merchant application
+  if (applicationLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Spinner size="lg" />
+          <p className="mt-4 text-gray-500">Loading dashboard...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show message if user has no merchant
+  if (!merchantId && !urlMerchantId) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="h-16 w-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Store className="h-8 w-8 text-gray-400" />
+          </div>
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">No Merchant Found</h2>
+          <p className="text-gray-500 mb-4">You don't have a merchant account yet.</p>
+          <Button onClick={() => navigate('/merchant/register')}>
+            Register as Merchant
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
   if (isLoading && !merchant) {
     return (
@@ -130,10 +169,13 @@ export default function MerchantDashboard() {
     )
   }
 
-  // Use merchant data or defaults
-  const displayMerchant = merchant || {
+  // Use merchant data or defaults - handle both 'name' and 'businessName' fields
+  const displayMerchant = merchant ? {
+    ...merchant,
+    name: merchant.name || merchant.businessName || 'Your Restaurant',
+  } : {
     name: 'Your Restaurant',
-    logo: 'https://via.placeholder.com/100',
+    logo: PLACEHOLDER_IMAGE,
     rating: 0,
     totalOrders: 0,
     isOpen: false,
@@ -146,11 +188,11 @@ export default function MerchantDashboard() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <img
-              src={displayMerchant.logo || displayMerchant.image || 'https://via.placeholder.com/100'}
+              src={displayMerchant.logo || displayMerchant.image || PLACEHOLDER_IMAGE}
               alt={displayMerchant.name}
               className="h-12 w-12 rounded-full bg-white object-cover"
               onError={(e) => {
-                (e.target as HTMLImageElement).src = 'https://via.placeholder.com/100'
+                (e.target as HTMLImageElement).src = PLACEHOLDER_IMAGE
               }}
             />
             <div>

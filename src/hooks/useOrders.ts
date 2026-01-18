@@ -98,6 +98,10 @@ export function useOrders(): UseOrdersReturn {
         return orderItem
       })
 
+      // Fetch merchant to get userId for permission checking
+      const merchantDoc = await getDocument<Merchant>(collections.merchants, cart.merchantId)
+      const merchantUserId = merchantDoc?.userId || cart.merchantId
+
       // Build delivery address object (exclude undefined values for Firestore)
       const deliveryAddressData: Record<string, any> = {
         address: deliveryAddress.address,
@@ -114,6 +118,7 @@ export function useOrders(): UseOrdersReturn {
         id: orderId,
         customerId,
         merchantId: cart.merchantId,
+        merchantUserId, // Store merchant's userId for Firestore permission checking
         merchantName: cart.merchantName,
         type: cart.merchantType === 'grocery'
           ? 'grocery'

@@ -14,6 +14,7 @@ import type { Order, OrderStatus } from '@/types'
 
 interface UseMerchantOrdersOptions {
   merchantId?: string
+  merchantUserId?: string // The merchant's userId (phone number or UID) for querying orders
   status?: OrderStatus | OrderStatus[]
   limitCount?: number
   realtime?: boolean
@@ -36,6 +37,7 @@ export function useMerchantOrders(options: UseMerchantOrdersOptions = {}): UseMe
   const { user, profile } = useAuthStore()
   const {
     merchantId: propMerchantId,
+    merchantUserId: propMerchantUserId,
     status,
     limitCount = 50,
     realtime = true,
@@ -45,8 +47,10 @@ export function useMerchantOrders(options: UseMerchantOrdersOptions = {}): UseMe
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Use provided merchantId or get from user profile
+  // Use provided merchantUserId for queries (required for Firestore security rules)
+  // Fall back to merchantId for backwards compatibility
   const merchantId = propMerchantId || profile?.merchantId
+  const merchantUserId = propMerchantUserId
 
   // Fetch orders
   const fetchOrders = useCallback(async () => {
@@ -59,8 +63,12 @@ export function useMerchantOrders(options: UseMerchantOrdersOptions = {}): UseMe
         limit(limitCount),
       ]
 
-      // Only filter by merchant if specific ID provided (not 'all')
-      if (merchantId && merchantId !== 'all') {
+      // Query by merchantUserId for Firestore security rule compliance
+      // The security rules check merchantUserId field, so query must match
+      if (merchantUserId && merchantUserId !== 'all') {
+        constraints.unshift(where('merchantUserId', '==', merchantUserId))
+      } else if (merchantId && merchantId !== 'all') {
+        // Fallback to merchantId (may fail for non-admin users due to security rules)
         constraints.unshift(where('merchantId', '==', merchantId))
       }
 
@@ -81,7 +89,7 @@ export function useMerchantOrders(options: UseMerchantOrdersOptions = {}): UseMe
     } finally {
       setIsLoading(false)
     }
-  }, [merchantId, status, limitCount])
+  }, [merchantId, merchantUserId, status, limitCount])
 
   // Subscribe to real-time updates
   useEffect(() => {
@@ -97,8 +105,11 @@ export function useMerchantOrders(options: UseMerchantOrdersOptions = {}): UseMe
       limit(limitCount),
     ]
 
-    // Only filter by merchant if specific ID provided (not 'all')
-    if (merchantId && merchantId !== 'all') {
+    // Query by merchantUserId for Firestore security rule compliance
+    if (merchantUserId && merchantUserId !== 'all') {
+      constraints.unshift(where('merchantUserId', '==', merchantUserId))
+    } else if (merchantId && merchantId !== 'all') {
+      // Fallback to merchantId (may fail for non-admin users due to security rules)
       constraints.unshift(where('merchantId', '==', merchantId))
     }
 
@@ -120,7 +131,7 @@ export function useMerchantOrders(options: UseMerchantOrdersOptions = {}): UseMe
     )
 
     return () => unsubscribe()
-  }, [merchantId, status, limitCount, realtime, fetchOrders])
+  }, [merchantId, merchantUserId, status, limitCount, realtime, fetchOrders])
 
   // Count pending orders
   const pendingCount = orders.filter(o => o.status === 'pending').length
