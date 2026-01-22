@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -17,6 +17,16 @@ import { PesoSign } from '@/components/icons'
 import { Button, Card, Modal, Input, Spinner } from '@/components/ui'
 import { useMerchantImageUpload } from '@/hooks/useImageUpload'
 import { useMerchantApplication } from '@/hooks/useMerchantApplication'
+import {
+  getDocuments,
+  deleteDocument,
+  setDocument,
+  updateDocument,
+  collections,
+  where,
+  serverTimestamp,
+} from '@/services/firebase/firestore'
+import type { Product } from '@/types'
 
 interface MenuItem {
   id: string
@@ -32,90 +42,26 @@ interface MenuItem {
 interface Category {
   id: string
   name: string
-  itemCount: number
 }
-
-const MOCK_CATEGORIES: Category[] = [
-  { id: 'chicken', name: 'Chicken', itemCount: 8 },
-  { id: 'burgers', name: 'Burgers & Sandwiches', itemCount: 5 },
-  { id: 'spaghetti', name: 'Spaghetti', itemCount: 3 },
-  { id: 'sides', name: 'Sides & Extras', itemCount: 6 },
-  { id: 'desserts', name: 'Desserts', itemCount: 4 },
-  { id: 'drinks', name: 'Beverages', itemCount: 8 },
-]
-
-const MOCK_ITEMS: MenuItem[] = [
-  {
-    id: '1',
-    name: '1pc Chickenjoy w/ Rice',
-    description: 'Crispy, juicy, tender fried chicken served with steamed rice',
-    price: 99,
-    category: 'chicken',
-    image: 'https://images.unsplash.com/photo-1626645738196-c2a7c87a8f58?w=400',
-    available: true,
-  },
-  {
-    id: '2',
-    name: '2pc Chickenjoy w/ Rice',
-    description: '2 pieces of our famous Chickenjoy with steamed rice',
-    price: 169,
-    category: 'chicken',
-    image: 'https://images.unsplash.com/photo-1626645738196-c2a7c87a8f58?w=400',
-    available: true,
-  },
-  {
-    id: '3',
-    name: 'Jolly Spaghetti',
-    description: 'Sweet-style spaghetti with chunky sliced hotdog, ground meat, and cheese',
-    price: 55,
-    category: 'spaghetti',
-    image: 'https://images.unsplash.com/photo-1563379926898-05f4575a45d8?w=400',
-    available: true,
-  },
-  {
-    id: '4',
-    name: 'Burger Steak',
-    description: 'Savory beef patties smothered in mushroom gravy with rice',
-    price: 79,
-    category: 'burgers',
-    image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400',
-    available: true,
-  },
-  {
-    id: '5',
-    name: 'Yumburger',
-    description: 'Classic burger with special Jollibee sauce',
-    price: 39,
-    category: 'burgers',
-    available: false,
-  },
-  {
-    id: '6',
-    name: 'Peach Mango Pie',
-    description: 'Crispy pie filled with sweet peach and mango',
-    price: 39,
-    category: 'desserts',
-    image: 'https://images.unsplash.com/photo-1621955964441-c173e01c6f18?w=400',
-    available: true,
-  },
-]
 
 export default function MerchantMenu() {
   const navigate = useNavigate()
-  const [categories] = useState<Category[]>(MOCK_CATEGORIES)
-  const [items, setItems] = useState<MenuItem[]>(MOCK_ITEMS)
+  const [categories, setCategories] = useState<Category[]>([])
+  const [items, setItems] = useState<MenuItem[]>([])
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     price: '',
     comparePrice: '',
-    category: 'chicken',
+    category: '',
     image: '',
   })
 
@@ -126,6 +72,43 @@ export default function MerchantMenu() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
 
+  // Load products from Firestore
+  const loadProducts = useCallback(async () => {
+    if (!merchantId) return
+
+    setIsLoading(true)
+    try {
+      const products = await getDocuments<Product>(collections.products, [
+        where('merchantId', '==', merchantId),
+      ])
+
+      const menuItems: MenuItem[] = products.map((p) => ({
+        id: p.id,
+        name: p.name,
+        description: p.description,
+        price: p.price,
+        comparePrice: p.salePrice,
+        category: p.category,
+        image: p.image,
+        available: p.isAvailable,
+      }))
+
+      setItems(menuItems)
+
+      // Extract unique categories from products
+      const uniqueCategories = [...new Set(products.map((p) => p.category))].filter(Boolean)
+      setCategories(uniqueCategories.map((cat) => ({ id: cat, name: cat })))
+    } catch (error) {
+      console.error('Failed to load products:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [merchantId])
+
+  useEffect(() => {
+    loadProducts()
+  }, [loadProducts])
+
   const filteredItems = items.filter((item) => {
     if (selectedCategory && item.category !== selectedCategory) return false
     if (searchQuery) {
@@ -134,12 +117,29 @@ export default function MerchantMenu() {
     return true
   })
 
-  const handleToggleAvailability = (itemId: string) => {
+  const handleToggleAvailability = async (itemId: string) => {
+    const item = items.find((i) => i.id === itemId)
+    if (!item) return
+
+    const newAvailability = !item.available
+
+    // Optimistically update UI
     setItems((prev) =>
-      prev.map((item) =>
-        item.id === itemId ? { ...item, available: !item.available } : item
-      )
+      prev.map((i) => (i.id === itemId ? { ...i, available: newAvailability } : i))
     )
+
+    try {
+      await updateDocument(collections.products, itemId, {
+        isAvailable: newAvailability,
+      })
+    } catch (error) {
+      console.error('Failed to update availability:', error)
+      // Revert on error
+      setItems((prev) =>
+        prev.map((i) => (i.id === itemId ? { ...i, available: !newAvailability } : i))
+      )
+      alert('Failed to update availability. Please try again.')
+    }
   }
 
   const handleEdit = (item: MenuItem) => {
@@ -156,9 +156,18 @@ export default function MerchantMenu() {
     setShowAddModal(true)
   }
 
-  const handleDelete = (itemId: string) => {
-    if (confirm('Are you sure you want to delete this item?')) {
+  const handleDelete = async (itemId: string) => {
+    if (!confirm('Are you sure you want to delete this item?')) return
+
+    setDeletingId(itemId)
+    try {
+      await deleteDocument(collections.products, itemId)
       setItems((prev) => prev.filter((item) => item.id !== itemId))
+    } catch (error) {
+      console.error('Failed to delete:', error)
+      alert('Failed to delete item. Please try again.')
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -202,49 +211,52 @@ export default function MerchantMenu() {
 
   const handleSubmit = async () => {
     setIsSubmitting(true)
-    await new Promise((resolve) => setTimeout(resolve, 1000))
 
-    if (editingItem) {
-      setItems((prev) =>
-        prev.map((item) =>
-          item.id === editingItem.id
-            ? {
-                ...item,
-                name: formData.name,
-                description: formData.description,
-                price: parseFloat(formData.price),
-                comparePrice: formData.comparePrice ? parseFloat(formData.comparePrice) : undefined,
-                category: formData.category,
-                image: formData.image || undefined,
-              }
-            : item
-        )
-      )
-    } else {
-      const newItem: MenuItem = {
-        id: `item_${Date.now()}`,
+    try {
+      const productData = {
+        merchantId,
         name: formData.name,
         description: formData.description,
         price: parseFloat(formData.price),
-        comparePrice: formData.comparePrice ? parseFloat(formData.comparePrice) : undefined,
+        salePrice: formData.comparePrice ? parseFloat(formData.comparePrice) : null,
         category: formData.category,
-        image: formData.image || undefined,
-        available: true,
+        image: formData.image || '',
+        isFeatured: false,
+        tags: [],
       }
-      setItems((prev) => [...prev, newItem])
-    }
 
-    setIsSubmitting(false)
-    setShowAddModal(false)
-    setEditingItem(null)
-    setFormData({
-      name: '',
-      description: '',
-      price: '',
-      comparePrice: '',
-      category: 'chicken',
-      image: '',
-    })
+      if (editingItem) {
+        await updateDocument(collections.products, editingItem.id, productData)
+      } else {
+        const newId = `product_${Date.now()}`
+        await setDocument(collections.products, newId, {
+          ...productData,
+          isAvailable: true,
+          createdAt: serverTimestamp(),
+        })
+      }
+
+      // Reload products from Firestore
+      await loadProducts()
+
+      setShowAddModal(false)
+      setEditingItem(null)
+      setFormData({
+        name: '',
+        description: '',
+        price: '',
+        comparePrice: '',
+        category: '',
+        image: '',
+      })
+      setImagePreview(null)
+      resetUpload()
+    } catch (error) {
+      console.error('Failed to save:', error)
+      alert('Failed to save item. Please try again.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const closeModal = () => {
@@ -255,7 +267,7 @@ export default function MerchantMenu() {
       description: '',
       price: '',
       comparePrice: '',
-      category: 'chicken',
+      category: '',
       image: '',
     })
     setImagePreview(null)
@@ -343,7 +355,11 @@ export default function MerchantMenu() {
       </div>
 
       <div className="p-4 space-y-3">
-        {filteredItems.length === 0 ? (
+        {isLoading ? (
+          <div className="flex justify-center py-12">
+            <Spinner size="lg" />
+          </div>
+        ) : filteredItems.length === 0 ? (
           <Card className="text-center py-8">
             <Image className="h-12 w-12 text-gray-300 mx-auto mb-3" />
             <p className="text-gray-500">No items found</p>
@@ -409,9 +425,14 @@ export default function MerchantMenu() {
                     </button>
                     <button
                       onClick={() => handleDelete(item.id)}
-                      className="p-1.5 rounded bg-red-100 text-red-600 hover:bg-red-200"
+                      disabled={deletingId === item.id}
+                      className="p-1.5 rounded bg-red-100 text-red-600 hover:bg-red-200 disabled:opacity-50"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      {deletingId === item.id ? (
+                        <Spinner size="sm" className="h-4 w-4" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
                     </button>
                   </div>
                 </div>
