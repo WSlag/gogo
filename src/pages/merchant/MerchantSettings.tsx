@@ -20,10 +20,12 @@ import {
   ToggleLeft,
   ToggleRight,
 } from 'lucide-react'
-import { Card, Button, Modal, Input } from '@/components/ui'
+import { Card, Button, Modal, Input, Spinner } from '@/components/ui'
 import { useAuthStore } from '@/store/authStore'
-import { doc, getDoc, updateDoc } from 'firebase/firestore'
+import { doc, getDoc, updateDoc, Timestamp } from 'firebase/firestore'
 import { db } from '@/services/firebase/config'
+import { useMerchantImageUpload } from '@/hooks/useImageUpload'
+import { useMerchantApplication } from '@/hooks/useMerchantApplication'
 
 interface MerchantSettings {
   businessName: string
@@ -65,6 +67,12 @@ export default function MerchantSettings() {
   const [editField, setEditField] = useState<string>('')
   const [editValue, setEditValue] = useState<string>('')
   const [showHoursModal, setShowHoursModal] = useState(false)
+
+  // Image upload
+  const { merchantData } = useMerchantApplication()
+  const merchantId = merchantData?.id || ''
+  const { uploadBannerImage, uploadState } = useMerchantImageUpload(merchantId)
+  const isUploading = uploadState.status === 'uploading'
 
   useEffect(() => {
     fetchSettings()
@@ -139,6 +147,31 @@ export default function MerchantSettings() {
     setShowEditModal(true)
   }
 
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !merchantId) return
+
+    try {
+      const url = await uploadBannerImage(file)
+      if (url) {
+        // Update local state
+        setSettings((prev) => prev ? { ...prev, photoURL: url } : null)
+
+        // Update in Firestore
+        if (merchantId) {
+          await updateDoc(doc(db, 'merchants', merchantId), {
+            photoURL: url,
+            updatedAt: Timestamp.now(),
+          })
+        }
+      }
+    } catch (error) {
+      console.error('Photo upload failed:', error)
+    }
+
+    e.target.value = ''
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -179,16 +212,28 @@ export default function MerchantSettings() {
         <Card>
           <div className="flex items-center gap-4 mb-4">
             <div className="relative">
-              <div className="w-20 h-20 bg-orange-100 rounded-xl flex items-center justify-center">
+              <div className="w-20 h-20 bg-orange-100 rounded-xl flex items-center justify-center overflow-hidden">
                 {settings.photoURL ? (
-                  <img src={settings.photoURL} alt="" className="w-full h-full object-cover rounded-xl" />
+                  <img src={settings.photoURL} alt="" className="w-full h-full object-cover" />
                 ) : (
                   <Store className="h-10 w-10 text-orange-500" />
                 )}
+                {isUploading && (
+                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-xl">
+                    <Spinner size="sm" className="text-white" />
+                  </div>
+                )}
               </div>
-              <button className="absolute -bottom-1 -right-1 p-1.5 bg-orange-500 rounded-full">
+              <label className="absolute -bottom-1 -right-1 p-1.5 bg-orange-500 rounded-full cursor-pointer hover:bg-orange-600 transition">
                 <Camera className="h-4 w-4 text-white" />
-              </button>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handlePhotoUpload}
+                  disabled={isUploading}
+                />
+              </label>
             </div>
             <div className="flex-1">
               <h2 className="text-lg font-bold text-gray-900">{settings.businessName}</h2>

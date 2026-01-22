@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -10,9 +10,13 @@ import {
   ToggleRight,
   Image,
   Tag,
+  Upload,
+  X,
 } from 'lucide-react'
 import { PesoSign } from '@/components/icons'
 import { Button, Card, Modal, Input, Spinner } from '@/components/ui'
+import { useMerchantImageUpload } from '@/hooks/useImageUpload'
+import { useMerchantApplication } from '@/hooks/useMerchantApplication'
 
 interface MenuItem {
   id: string
@@ -115,6 +119,13 @@ export default function MerchantMenu() {
     image: '',
   })
 
+  // Image upload state
+  const { merchantData } = useMerchantApplication()
+  const merchantId = merchantData?.id || ''
+  const { uploadProductImage, uploadState, reset: resetUpload } = useMerchantImageUpload(merchantId)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+
   const filteredItems = items.filter((item) => {
     if (selectedCategory && item.category !== selectedCategory) return false
     if (searchQuery) {
@@ -141,6 +152,7 @@ export default function MerchantMenu() {
       category: item.category,
       image: item.image || '',
     })
+    setImagePreview(item.image || null)
     setShowAddModal(true)
   }
 
@@ -148,6 +160,44 @@ export default function MerchantMenu() {
     if (confirm('Are you sure you want to delete this item?')) {
       setItems((prev) => prev.filter((item) => item.id !== itemId))
     }
+  }
+
+  const handleImageClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Create local preview immediately
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      setImagePreview(event.target?.result as string)
+    }
+    reader.readAsDataURL(file)
+
+    // Generate a product ID for new items, or use existing
+    const productId = editingItem?.id || `item_${Date.now()}`
+
+    try {
+      const url = await uploadProductImage(file, productId)
+      if (url) {
+        setFormData((prev) => ({ ...prev, image: url }))
+      }
+    } catch (error) {
+      console.error('Upload failed:', error)
+      setImagePreview(null)
+    }
+
+    // Reset input
+    e.target.value = ''
+  }
+
+  const handleRemoveImage = () => {
+    setFormData((prev) => ({ ...prev, image: '' }))
+    setImagePreview(null)
+    resetUpload()
   }
 
   const handleSubmit = async () => {
@@ -208,10 +258,21 @@ export default function MerchantMenu() {
       category: 'chicken',
       image: '',
     })
+    setImagePreview(null)
+    resetUpload()
   }
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
+      {/* Hidden file input for image upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleFileChange}
+      />
+
       {/* Header */}
       <div className="bg-primary-600 text-white px-4 py-3">
         <div className="flex items-center justify-between">
@@ -441,12 +502,54 @@ export default function MerchantMenu() {
             </div>
           </div>
 
-          <Input
-            label="Image URL"
-            value={formData.image}
-            onChange={(e) => setFormData((prev) => ({ ...prev, image: e.target.value }))}
-            placeholder="https://example.com/image.jpg"
-          />
+          {/* Image Upload */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Item Image
+            </label>
+            <div
+              onClick={handleImageClick}
+              className="relative w-full h-40 rounded-lg border-2 border-dashed border-gray-300 hover:border-primary-500 cursor-pointer transition flex items-center justify-center overflow-hidden"
+            >
+              {(imagePreview || formData.image) ? (
+                <>
+                  <img
+                    src={imagePreview || formData.image}
+                    alt="Preview"
+                    className="w-full h-full object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleRemoveImage()
+                    }}
+                    className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </>
+              ) : (
+                <div className="flex flex-col items-center gap-2 text-gray-400">
+                  <Upload className="h-8 w-8" />
+                  <span className="text-sm">Click to upload image</span>
+                </div>
+              )}
+
+              {/* Upload Progress Overlay */}
+              {uploadState.status === 'uploading' && (
+                <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center">
+                  <Spinner className="text-white" />
+                  <span className="text-white text-sm mt-2">{Math.round(uploadState.progress)}%</span>
+                </div>
+              )}
+            </div>
+
+            {/* Error Message */}
+            {uploadState.status === 'error' && (
+              <p className="mt-1 text-sm text-red-500">{uploadState.error}</p>
+            )}
+          </div>
 
           <div className="flex gap-3 pt-2">
             <Button variant="outline" fullWidth onClick={closeModal}>

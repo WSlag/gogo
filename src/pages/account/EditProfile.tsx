@@ -8,14 +8,20 @@ import {
   Mail,
   Check,
 } from 'lucide-react'
-import { Card, Button } from '@/components/ui'
+import { Card, Button, Spinner } from '@/components/ui'
 import { useAuth } from '@/hooks/useAuth'
+import { useProfileImageUpload } from '@/hooks/useImageUpload'
 
 export default function EditProfile() {
   const navigate = useNavigate()
   const { profile, user: firebaseUser, updateUserProfile } = useAuth()
   const [isSaving, setIsSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+
+  // Profile image upload
+  const { uploadProfileImage, uploadState } = useProfileImageUpload()
+  const isUploading = uploadState.status === 'uploading'
+  const [photoURL, setPhotoURL] = useState<string | null>(null)
 
   // Use actual user data from auth context
   const [formData, setFormData] = useState({
@@ -33,6 +39,7 @@ export default function EditProfile() {
       phone: profile?.phone || firebaseUser?.phoneNumber || '',
       email: profile?.email || firebaseUser?.email || '',
     })
+    setPhotoURL(profile?.profileImage || firebaseUser?.photoURL || null)
   }, [profile, firebaseUser])
 
   const handleInputChange = (field: keyof typeof formData, value: string) => {
@@ -58,6 +65,26 @@ export default function EditProfile() {
     } finally {
       setIsSaving(false)
     }
+  }
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    try {
+      const url = await uploadProfileImage(file)
+      if (url) {
+        setPhotoURL(url)
+        // Update profile with new photo
+        await updateUserProfile({
+          profileImage: url,
+        })
+      }
+    } catch (error) {
+      console.error('Photo upload failed:', error)
+    }
+
+    e.target.value = ''
   }
 
   return (
@@ -98,14 +125,35 @@ export default function EditProfile() {
         <Card>
           <div className="flex flex-col items-center py-4">
             <div className="relative">
-              <div className="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-primary-500 to-primary-600 text-3xl font-bold text-white">
-                {formData.firstName?.[0] || 'U'}{formData.lastName?.[0] || ''}
+              <div className="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-primary-500 to-primary-600 text-3xl font-bold text-white overflow-hidden">
+                {photoURL ? (
+                  <img src={photoURL} alt="Profile" className="h-full w-full object-cover" />
+                ) : (
+                  <>{formData.firstName?.[0] || 'U'}{formData.lastName?.[0] || ''}</>
+                )}
+                {isUploading && (
+                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                    <Spinner size="sm" className="text-white" />
+                  </div>
+                )}
               </div>
-              <button className="absolute bottom-0 right-0 flex h-8 w-8 items-center justify-center rounded-full bg-primary-600 text-white shadow-lg hover:bg-primary-700 transition-colors">
+              <label className="absolute bottom-0 right-0 flex h-8 w-8 items-center justify-center rounded-full bg-primary-600 text-white shadow-lg hover:bg-primary-700 transition-colors cursor-pointer">
                 <Camera className="h-4 w-4" />
-              </button>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handlePhotoUpload}
+                  disabled={isUploading}
+                />
+              </label>
             </div>
-            <p className="mt-3 text-sm text-gray-500">Tap to change photo</p>
+            <p className="mt-3 text-sm text-gray-500">
+              {isUploading ? 'Uploading...' : 'Tap to change photo'}
+            </p>
+            {uploadState.status === 'error' && (
+              <p className="text-sm text-red-500 mt-1">{uploadState.error}</p>
+            )}
           </div>
         </Card>
 
