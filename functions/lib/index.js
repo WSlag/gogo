@@ -344,34 +344,58 @@ async function handleRideCompleted(rideId, ride) {
             totalRides: admin.firestore.FieldValue.increment(1),
         });
     }
-    // Process payment if using wallet
+    // Process payment if using wallet - USE TRANSACTION for atomic balance update
     if (ride.paymentMethod === 'wallet') {
-        const userDoc = await db.collection('users').doc(ride.passengerId).get();
-        const userData = userDoc.data();
-        if (userData) {
-            const newBalance = userData.walletBalance - ride.fare.total;
-            await db.collection('users').doc(ride.passengerId).update({
+        const userRef = db.collection('users').doc(ride.passengerId);
+        await db.runTransaction(async (transaction) => {
+            const userDoc = await transaction.get(userRef);
+            const userData = userDoc.data();
+            if (!userData) {
+                throw new Error('User not found');
+            }
+            const currentBalance = userData.walletBalance || 0;
+            const fareAmount = ride.fare?.total || 0;
+            const newBalance = currentBalance - fareAmount;
+            // Ensure balance doesn't go negative (should have been checked before ride)
+            if (newBalance < 0) {
+                console.warn(`User ${ride.passengerId} has insufficient balance for ride ${rideId}`);
+            }
+            // Update user balance atomically
+            transaction.update(userRef, {
                 walletBalance: newBalance,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             });
-            // Create transaction record
-            await db.collection('transactions').add({
+            // Create transaction record within the same transaction
+            const transactionRef = db.collection('transactions').doc();
+            transaction.set(transactionRef, {
                 userId: ride.passengerId,
                 type: 'payment',
-                amount: ride.fare.total,
+                amount: -fareAmount,
                 balance: newBalance,
                 reference: rideId,
+                referenceType: 'ride',
                 description: `Ride payment - ${ride.vehicleType}`,
                 status: 'completed',
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
                 updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             });
-        }
+            // Update ride payment status within transaction
+            const rideRef = db.collection('rides').doc(rideId);
+            transaction.update(rideRef, {
+                paymentStatus: 'paid',
+                paymentTransactionId: transactionRef.id,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+        });
+        console.log(`Ride ${rideId} wallet payment processed with transaction`);
     }
-    // Update ride payment status
-    await db.collection('rides').doc(rideId).update({
-        paymentStatus: 'paid',
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
+    else {
+        // For non-wallet payments, just update ride status
+        await db.collection('rides').doc(rideId).update({
+            paymentStatus: 'paid',
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+    }
     console.log(`Ride ${rideId} completed and processed`);
 }
 async function handleRideCancelled(rideId, ride) {
@@ -446,33 +470,60 @@ async function handleOrderDelivered(orderId, order) {
     await db.collection('merchants').doc(order.merchantId).update({
         totalOrders: admin.firestore.FieldValue.increment(1),
     });
-    // Process payment if wallet
+    // Process payment if wallet - USE TRANSACTION for atomic balance update
     if (order.paymentMethod === 'wallet') {
-        const userDoc = await db.collection('users').doc(order.customerId).get();
-        const userData = userDoc.data();
-        if (userData) {
-            const newBalance = userData.walletBalance - order.total;
-            await db.collection('users').doc(order.customerId).update({
+        const userRef = db.collection('users').doc(order.customerId);
+        await db.runTransaction(async (transaction) => {
+            const userDoc = await transaction.get(userRef);
+            const userData = userDoc.data();
+            if (!userData) {
+                throw new Error('User not found');
+            }
+            const currentBalance = userData.walletBalance || 0;
+            const orderAmount = order.total || 0;
+            const newBalance = currentBalance - orderAmount;
+            // Ensure balance doesn't go negative
+            if (newBalance < 0) {
+                console.warn(`User ${order.customerId} has insufficient balance for order ${orderId}`);
+            }
+            // Update user balance atomically
+            transaction.update(userRef, {
                 walletBalance: newBalance,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             });
-            await db.collection('transactions').add({
+            // Create transaction record within the same transaction
+            const transactionRef = db.collection('transactions').doc();
+            transaction.set(transactionRef, {
                 userId: order.customerId,
                 type: 'payment',
-                amount: order.total,
+                amount: -orderAmount,
                 balance: newBalance,
                 reference: orderId,
+                referenceType: 'order',
                 description: `Order payment - ${order.type}`,
                 status: 'completed',
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
                 updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             });
-        }
+            // Update order payment status within transaction
+            const orderRef = db.collection('orders').doc(orderId);
+            transaction.update(orderRef, {
+                paymentStatus: 'paid',
+                paymentTransactionId: transactionRef.id,
+                deliveredAt: admin.firestore.FieldValue.serverTimestamp(),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+        });
+        console.log(`Order ${orderId} wallet payment processed with transaction`);
     }
-    await db.collection('orders').doc(orderId).update({
-        paymentStatus: 'paid',
-        deliveredAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
+    else {
+        // For non-wallet payments, just update order status
+        await db.collection('orders').doc(orderId).update({
+            paymentStatus: 'paid',
+            deliveredAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+    }
     console.log(`Order ${orderId} delivered and processed`);
 }
 // ==========================================
@@ -490,35 +541,43 @@ exports.processTopUp = functions.https.onCall(async (data, context) => {
     if (!amount || amount < 100) {
         throw new functions.https.HttpsError('invalid-argument', 'Minimum top-up is ₱100');
     }
-    // Get current balance
-    const userDoc = await db.collection('users').doc(userId).get();
-    const userData = userDoc.data();
-    if (!userData) {
-        throw new functions.https.HttpsError('not-found', 'User not found');
-    }
-    const newBalance = userData.walletBalance + amount;
     // In production, integrate with actual payment gateway here
     // For demo, we simulate successful payment
-    // Update balance
-    await db.collection('users').doc(userId).update({
-        walletBalance: newBalance,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-    // Create transaction record
-    const transactionRef = await db.collection('transactions').add({
-        userId,
-        type: 'topup',
-        amount,
-        balance: newBalance,
-        paymentMethod,
-        description: `Wallet top up via ${paymentMethod}`,
-        status: 'completed',
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    // USE TRANSACTION for atomic balance update to prevent race conditions
+    const userRef = db.collection('users').doc(userId);
+    let transactionId = '';
+    let newBalance = 0;
+    await db.runTransaction(async (transaction) => {
+        const userDoc = await transaction.get(userRef);
+        const userData = userDoc.data();
+        if (!userData) {
+            throw new functions.https.HttpsError('not-found', 'User not found');
+        }
+        const currentBalance = userData.walletBalance || 0;
+        newBalance = currentBalance + amount;
+        // Update balance atomically
+        transaction.update(userRef, {
+            walletBalance: newBalance,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        // Create transaction record within the same transaction
+        const transactionRef = db.collection('transactions').doc();
+        transactionId = transactionRef.id;
+        transaction.set(transactionRef, {
+            userId,
+            type: 'topup',
+            amount,
+            balance: newBalance,
+            paymentMethod,
+            description: `Wallet top up via ${paymentMethod}`,
+            status: 'completed',
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
     });
     return {
         success: true,
-        transactionId: transactionRef.id,
+        transactionId,
         newBalance,
     };
 });
@@ -630,7 +689,7 @@ exports.createPaymentIntent = functions.https.onCall(async (data, context) => {
                         card: { request_three_d_secure: 'any' },
                     },
                     currency: 'PHP',
-                    description: description || 'GOGO Payment',
+                    description: description || 'GOGO Express Payment',
                     metadata: {
                         ...metadata,
                         userId: context.auth.uid,
@@ -690,14 +749,14 @@ exports.createPaymentSource = functions.https.onCall(async (data, context) => {
                         failed: failedUrl,
                     },
                     billing: {
-                        name: metadata?.customerName || 'GOGO Customer',
+                        name: metadata?.customerName || 'GOGO Express Customer',
                         email: metadata?.customerEmail || '',
                         phone: metadata?.customerPhone || '',
                     },
                     metadata: {
                         ...metadata,
                         userId: context.auth.uid,
-                        description: description || 'GOGO Payment',
+                        description: description || 'GOGO Express Payment',
                     },
                 },
             },
@@ -736,42 +795,54 @@ exports.processRidePayment = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError('permission-denied', 'Not authorized to pay for this ride');
     }
     try {
-        // For wallet payments, deduct from balance
+        // For wallet payments, deduct from balance using TRANSACTION
         if (paymentMethod === 'wallet') {
-            const userDoc = await db.collection('users').doc(userId).get();
-            const userData = userDoc.data();
-            if (!userData || userData.walletBalance < amount) {
-                throw new functions.https.HttpsError('failed-precondition', 'Insufficient wallet balance');
-            }
-            const newBalance = userData.walletBalance - amount;
-            await db.collection('users').doc(userId).update({
-                walletBalance: newBalance,
-                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            });
-            // Create transaction record
-            const transactionRef = await db.collection('transactions').add({
-                userId,
-                type: 'payment',
-                amount: -amount,
-                balance: newBalance,
-                reference: rideId,
-                referenceType: 'ride',
-                paymentMethod: 'wallet',
-                description: `Ride payment - ${rideData?.vehicleType || 'ride'}`,
-                status: 'completed',
-                createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            });
-            // Update ride payment status
-            await db.collection('rides').doc(rideId).update({
-                paymentStatus: 'paid',
-                paidAt: admin.firestore.FieldValue.serverTimestamp(),
-                paymentTransactionId: transactionRef.id,
-                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            const userRef = db.collection('users').doc(userId);
+            const rideRef = db.collection('rides').doc(rideId);
+            let transactionId = '';
+            await db.runTransaction(async (transaction) => {
+                const userDoc = await transaction.get(userRef);
+                const userData = userDoc.data();
+                if (!userData) {
+                    throw new functions.https.HttpsError('not-found', 'User not found');
+                }
+                const currentBalance = userData.walletBalance || 0;
+                if (currentBalance < amount) {
+                    throw new functions.https.HttpsError('failed-precondition', 'Insufficient wallet balance');
+                }
+                const newBalance = currentBalance - amount;
+                // Update balance atomically
+                transaction.update(userRef, {
+                    walletBalance: newBalance,
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                });
+                // Create transaction record within the same transaction
+                const transactionRef = db.collection('transactions').doc();
+                transactionId = transactionRef.id;
+                transaction.set(transactionRef, {
+                    userId,
+                    type: 'payment',
+                    amount: -amount,
+                    balance: newBalance,
+                    reference: rideId,
+                    referenceType: 'ride',
+                    paymentMethod: 'wallet',
+                    description: `Ride payment - ${rideData?.vehicleType || 'ride'}`,
+                    status: 'completed',
+                    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                });
+                // Update ride payment status within transaction
+                transaction.update(rideRef, {
+                    paymentStatus: 'paid',
+                    paidAt: admin.firestore.FieldValue.serverTimestamp(),
+                    paymentTransactionId: transactionRef.id,
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                });
             });
             return {
                 success: true,
-                transactionId: transactionRef.id,
+                transactionId,
             };
         }
         // For cash payments, just mark as pending
@@ -794,6 +865,9 @@ exports.processRidePayment = functions.https.onCall(async (data, context) => {
     }
     catch (error) {
         console.error('processRidePayment error:', error);
+        if (error instanceof functions.https.HttpsError) {
+            throw error;
+        }
         throw new functions.https.HttpsError('internal', error instanceof Error ? error.message : 'Payment failed');
     }
 });
@@ -817,42 +891,54 @@ exports.processOrderPayment = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError('permission-denied', 'Not authorized to pay for this order');
     }
     try {
-        // For wallet payments, deduct from balance
+        // For wallet payments, deduct from balance using TRANSACTION
         if (paymentMethod === 'wallet') {
-            const userDoc = await db.collection('users').doc(userId).get();
-            const userData = userDoc.data();
-            if (!userData || userData.walletBalance < amount) {
-                throw new functions.https.HttpsError('failed-precondition', 'Insufficient wallet balance');
-            }
-            const newBalance = userData.walletBalance - amount;
-            await db.collection('users').doc(userId).update({
-                walletBalance: newBalance,
-                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            });
-            // Create transaction record
-            const transactionRef = await db.collection('transactions').add({
-                userId,
-                type: 'payment',
-                amount: -amount,
-                balance: newBalance,
-                reference: orderId,
-                referenceType: 'order',
-                paymentMethod: 'wallet',
-                description: `Order payment - ${orderData?.type || 'order'}`,
-                status: 'completed',
-                createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            });
-            // Update order payment status
-            await db.collection('orders').doc(orderId).update({
-                paymentStatus: 'paid',
-                paidAt: admin.firestore.FieldValue.serverTimestamp(),
-                paymentTransactionId: transactionRef.id,
-                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            const userRef = db.collection('users').doc(userId);
+            const orderRef = db.collection('orders').doc(orderId);
+            let transactionId = '';
+            await db.runTransaction(async (transaction) => {
+                const userDoc = await transaction.get(userRef);
+                const userData = userDoc.data();
+                if (!userData) {
+                    throw new functions.https.HttpsError('not-found', 'User not found');
+                }
+                const currentBalance = userData.walletBalance || 0;
+                if (currentBalance < amount) {
+                    throw new functions.https.HttpsError('failed-precondition', 'Insufficient wallet balance');
+                }
+                const newBalance = currentBalance - amount;
+                // Update balance atomically
+                transaction.update(userRef, {
+                    walletBalance: newBalance,
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                });
+                // Create transaction record within the same transaction
+                const transactionRef = db.collection('transactions').doc();
+                transactionId = transactionRef.id;
+                transaction.set(transactionRef, {
+                    userId,
+                    type: 'payment',
+                    amount: -amount,
+                    balance: newBalance,
+                    reference: orderId,
+                    referenceType: 'order',
+                    paymentMethod: 'wallet',
+                    description: `Order payment - ${orderData?.type || 'order'}`,
+                    status: 'completed',
+                    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                });
+                // Update order payment status within transaction
+                transaction.update(orderRef, {
+                    paymentStatus: 'paid',
+                    paidAt: admin.firestore.FieldValue.serverTimestamp(),
+                    paymentTransactionId: transactionRef.id,
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                });
             });
             return {
                 success: true,
-                transactionId: transactionRef.id,
+                transactionId,
             };
         }
         // For cash payments, just mark as pending
@@ -874,6 +960,9 @@ exports.processOrderPayment = functions.https.onCall(async (data, context) => {
     }
     catch (error) {
         console.error('processOrderPayment error:', error);
+        if (error instanceof functions.https.HttpsError) {
+            throw error;
+        }
         throw new functions.https.HttpsError('internal', error instanceof Error ? error.message : 'Payment failed');
     }
 });
@@ -944,7 +1033,7 @@ exports.verifyEWalletPayment = functions.https.onCall(async (data, context) => {
                         id: sourceId,
                         type: 'source',
                     },
-                    description: 'GOGO Payment',
+                    description: 'GOGO Express Payment',
                 },
             },
         });
