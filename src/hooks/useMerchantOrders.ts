@@ -54,6 +54,12 @@ export function useMerchantOrders(options: UseMerchantOrdersOptions = {}): UseMe
 
   // Fetch orders
   const fetchOrders = useCallback(async () => {
+    // Wait for merchantUserId to be available for proper security rule compliance
+    if (!merchantUserId && !merchantId) {
+      setIsLoading(false)
+      return
+    }
+
     try {
       setIsLoading(true)
       setError(null)
@@ -68,8 +74,12 @@ export function useMerchantOrders(options: UseMerchantOrdersOptions = {}): UseMe
       if (merchantUserId && merchantUserId !== 'all') {
         constraints.unshift(where('merchantUserId', '==', merchantUserId))
       } else if (merchantId && merchantId !== 'all') {
-        // Fallback to merchantId (may fail for non-admin users due to security rules)
+        // Fallback to merchantId - only works if merchantId equals the user's UID
         constraints.unshift(where('merchantId', '==', merchantId))
+      } else {
+        // No valid filter - skip fetch to avoid permission errors
+        setIsLoading(false)
+        return
       }
 
       // Add status filter if provided
@@ -98,6 +108,13 @@ export function useMerchantOrders(options: UseMerchantOrdersOptions = {}): UseMe
       return
     }
 
+    // Wait for merchantUserId to be available for proper security rule compliance
+    // Without merchantUserId, the query will fail with permission-denied
+    if (!merchantUserId && !merchantId) {
+      setIsLoading(false)
+      return
+    }
+
     setIsLoading(true)
 
     const constraints = [
@@ -106,11 +123,17 @@ export function useMerchantOrders(options: UseMerchantOrdersOptions = {}): UseMe
     ]
 
     // Query by merchantUserId for Firestore security rule compliance
+    // The security rules require merchantUserId to match the authenticated user
     if (merchantUserId && merchantUserId !== 'all') {
       constraints.unshift(where('merchantUserId', '==', merchantUserId))
     } else if (merchantId && merchantId !== 'all') {
-      // Fallback to merchantId (may fail for non-admin users due to security rules)
+      // Fallback to merchantId - only works if merchantId equals the user's UID
+      // This will fail for non-admin users if merchantId is not their UID
       constraints.unshift(where('merchantId', '==', merchantId))
+    } else {
+      // No valid filter - skip subscription to avoid permission errors
+      setIsLoading(false)
+      return
     }
 
     if (status) {
