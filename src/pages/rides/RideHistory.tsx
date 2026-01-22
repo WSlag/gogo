@@ -57,8 +57,6 @@ export default function RideHistory() {
     switch (type) {
       case 'motorcycle':
         return 'motorcycle'
-      case 'airport':
-        return 'plane'
       case 'delivery':
       case 'happy_move':
         return 'truck'

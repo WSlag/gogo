@@ -4,7 +4,6 @@ import {
   ShoppingCart,
   Package,
   Wallet,
-  Plane,
   Pill,
   MoreHorizontal,
   Car
@@ -54,14 +53,6 @@ const services: ServiceItem[] = [
     path: '/wallet',
     color: 'text-gray-600 group-hover:text-purple-600',
     bgColor: 'bg-gray-50 group-hover:bg-purple-50'
-  },
-  {
-    id: 'airport',
-    label: 'Airport',
-    icon: Plane,
-    path: '/rides?type=airport',
-    color: 'text-gray-600 group-hover:text-sky-600',
-    bgColor: 'bg-gray-50 group-hover:bg-sky-50'
   },
   {
     id: 'rides',

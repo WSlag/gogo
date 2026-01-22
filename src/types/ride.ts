@@ -1,6 +1,6 @@
 import type { Timestamp, GeoPoint } from 'firebase/firestore'
 
-export type VehicleType = 'motorcycle' | 'car' | 'van' | 'delivery' | 'happy_move' | 'airport'
+export type VehicleType = 'motorcycle' | 'car' | 'van' | 'delivery' | 'happy_move'
 
 export type RideStatus =
   | 'pending'
@@ -169,17 +169,5 @@ export const VEHICLE_TYPES: VehicleTypeInfo[] = [
     minFare: 350,
     capacity: 0,
     estimatedArrival: '15-25 min',
-  },
-  {
-    type: 'airport',
-    name: 'Airport',
-    description: 'Pre-bookable airport rides',
-    icon: '✈️',
-    baseFare: 350,
-    perKm: 0,
-    perMinute: 0,
-    minFare: 350,
-    capacity: 4,
-    estimatedArrival: '10-15 min',
   },
 ]

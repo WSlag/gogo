@@ -55,22 +55,6 @@ const mockRecentRides: RecentRide[] = [
     vehicleType: 'motorcycle',
     fare: 50,
     date: '2 days ago'
-  },
-  {
-    id: '3',
-    pickup: {
-      label: 'Awang Airport',
-      address: 'Awang, Datu Odin Sinsuat',
-      coordinates: new GeoPoint(7.1644, 124.2094)
-    },
-    dropoff: {
-      label: 'Mall of Alnor Cotabato',
-      address: 'Sinsuat Ave, Cotabato City',
-      coordinates: new GeoPoint(7.2180, 124.2460)
-    },
-    vehicleType: 'airport',
-    fare: 350,
-    date: '3 days ago'
   }
 ]
 

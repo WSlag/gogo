@@ -226,11 +226,6 @@ export default function RideHome() {
                         Fastest
                       </span>
                     )}
-                    {vehicle.type === 'airport' && (
-                      <span className="rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-medium text-purple-700">
-                        Fixed Rate
-                      </span>
-                    )}
                   </div>
                   <p className="mt-0.5 text-sm text-gray-500">
                     {vehicle.description}

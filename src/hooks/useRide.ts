@@ -97,18 +97,6 @@ export const VEHICLE_TYPES: Record<VehicleType, VehicleTypeInfo> = {
     capacity: 0,
     estimatedArrival: '15-25 min',
   },
-  airport: {
-    type: 'airport',
-    name: 'Airport',
-    description: 'Airport transfer',
-    icon: 'plane',
-    baseFare: 350,
-    perKm: 0,
-    perMinute: 0,
-    minFare: 350,
-    capacity: 4,
-    estimatedArrival: '10-15 min',
-  },
 }
 
 // Surge pricing configuration (lower multipliers for price-sensitive Cotabato market)
