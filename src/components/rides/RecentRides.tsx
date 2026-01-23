@@ -1,9 +1,12 @@
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronRight, RotateCcw } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import { useRideStore } from '@/store'
-import { GeoPoint } from 'firebase/firestore'
-import type { VehicleType } from '@/types'
+import { GeoPoint, Timestamp } from 'firebase/firestore'
+import type { VehicleType, Ride } from '@/types'
+import { useRide } from '@/hooks/useRide'
+import { useAuthStore } from '@/store/authStore'
 
 interface RecentRide {
   id: string
@@ -22,41 +25,36 @@ interface RecentRide {
   date: string
 }
 
-// Mock data for recent rides - Cotabato City locations
-const mockRecentRides: RecentRide[] = [
-  {
-    id: '1',
+function formatRelativeDate(timestamp: Timestamp | undefined): string {
+  if (!timestamp) return ''
+  const date = timestamp.toDate()
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+  if (diffDays === 0) return 'Today'
+  if (diffDays === 1) return 'Yesterday'
+  if (diffDays < 7) return `${diffDays} days ago`
+  return date.toLocaleDateString()
+}
+
+function rideToRecentRide(ride: Ride): RecentRide {
+  return {
+    id: ride.id,
     pickup: {
-      label: 'KCC Mall of Cotabato',
-      address: '66CX+37P, Cotabato City',
-      coordinates: new GeoPoint(7.2236, 124.2519)
+      label: ride.pickup.details || ride.pickup.address.split(',')[0],
+      address: ride.pickup.address,
+      coordinates: ride.pickup.coordinates,
     },
     dropoff: {
-      label: 'Rosary Heights',
-      address: 'Rosary Heights, Cotabato City',
-      coordinates: new GeoPoint(7.2156, 124.2512)
+      label: ride.dropoff.details || ride.dropoff.address.split(',')[0],
+      address: ride.dropoff.address,
+      coordinates: ride.dropoff.coordinates,
     },
-    vehicleType: 'car',
-    fare: 85,
-    date: 'Yesterday'
-  },
-  {
-    id: '2',
-    pickup: {
-      label: 'CityMall Cotabato',
-      address: 'Unit 157, Gov. Gutierrez Ave, Cotabato City',
-      coordinates: new GeoPoint(7.2197, 124.2486)
-    },
-    dropoff: {
-      label: 'Home',
-      address: 'Poblacion VIII, Cotabato City',
-      coordinates: new GeoPoint(7.2156, 124.2450)
-    },
-    vehicleType: 'motorcycle',
-    fare: 50,
-    date: '2 days ago'
+    vehicleType: ride.vehicleType,
+    fare: ride.fare.total,
+    date: formatRelativeDate(ride.completedAt || ride.createdAt),
   }
-]
+}
 
 interface RecentRidesProps {
   className?: string
@@ -66,9 +64,36 @@ interface RecentRidesProps {
 export function RecentRides({ className, onSeeAll }: RecentRidesProps) {
   const navigate = useNavigate()
   const { setPickup, setDropoff, setVehicleType } = useRideStore()
+  const { user } = useAuthStore()
+  const { getRideHistory } = useRide()
+  const [recentRides, setRecentRides] = useState<RecentRide[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!user) {
+      setLoading(false)
+      return
+    }
+
+    const fetchRides = async () => {
+      try {
+        const rides = await getRideHistory(5)
+        const completed = rides
+          .filter(r => r.status === 'completed')
+          .slice(0, 3)
+          .map(rideToRecentRide)
+        setRecentRides(completed)
+      } catch (error) {
+        console.error('Error fetching recent rides:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchRides()
+  }, [user])
 
   const handleRebook = (ride: RecentRide) => {
-    // Set pickup and dropoff from recent ride
     setPickup({
       address: ride.pickup.address,
       coordinates: ride.pickup.coordinates,
@@ -80,12 +105,10 @@ export function RecentRides({ className, onSeeAll }: RecentRidesProps) {
       details: ride.dropoff.label
     })
     setVehicleType(ride.vehicleType)
-
-    // Navigate to rides page
     navigate('/rides')
   }
 
-  if (mockRecentRides.length === 0) {
+  if (loading || recentRides.length === 0) {
     return null
   }
 
@@ -107,7 +130,7 @@ export function RecentRides({ className, onSeeAll }: RecentRidesProps) {
 
       {/* Horizontal scroll container */}
       <div className="flex gap-3 overflow-x-auto hide-scrollbar snap-x snap-mandatory pb-2">
-        {mockRecentRides.map((ride) => (
+        {recentRides.map((ride) => (
           <RecentRideCard
             key={ride.id}
             ride={ride}

@@ -352,8 +352,8 @@ export default function AdminDrivers() {
       setDrivers(filtered)
     } catch (error) {
       console.error('Error fetching drivers:', error)
-      // Use mock data for demo
-      setDrivers(MOCK_DRIVERS)
+      setDrivers([])
+      setSeedMessage({ type: 'error', text: 'Failed to load drivers. Pull down to retry.' })
     } finally {
       setLoading(false)
     }
@@ -952,74 +952,3 @@ export default function AdminDrivers() {
   )
 }
 
-// Mock data for demo
-const MOCK_DRIVERS: Driver[] = [
-  {
-    id: '1',
-    name: 'Juan Dela Cruz',
-    email: 'juan@example.com',
-    phone: '+639123456789',
-    vehicleType: 'motorcycle',
-    vehiclePlate: 'ABC 1234',
-    vehicleModel: 'Honda Click 125i',
-    status: 'online',
-    isApproved: true,
-    isSuspended: false,
-    isPending: false,
-    rating: 4.8,
-    totalRides: 1250,
-    totalEarnings: 125000,
-    joinedAt: new Date('2024-01-15'),
-  },
-  {
-    id: '2',
-    name: 'Maria Santos',
-    email: 'maria@example.com',
-    phone: '+639987654321',
-    vehicleType: 'car',
-    vehiclePlate: 'XYZ 5678',
-    vehicleModel: 'Toyota Vios 2022',
-    status: 'busy',
-    isApproved: true,
-    isSuspended: false,
-    isPending: false,
-    rating: 4.9,
-    totalRides: 890,
-    totalEarnings: 178000,
-    joinedAt: new Date('2024-02-20'),
-  },
-  {
-    id: '3',
-    name: 'Pedro Reyes',
-    email: 'pedro@example.com',
-    phone: '+639555123456',
-    vehicleType: 'motorcycle',
-    vehiclePlate: 'DEF 9012',
-    vehicleModel: 'Yamaha Mio',
-    status: 'offline',
-    isApproved: false,
-    isSuspended: false,
-    isPending: true,
-    rating: 0,
-    totalRides: 0,
-    totalEarnings: 0,
-    joinedAt: new Date('2024-03-10'),
-  },
-  {
-    id: '4',
-    name: 'Jose Garcia',
-    email: 'jose@example.com',
-    phone: '+639777888999',
-    vehicleType: 'car',
-    vehiclePlate: 'GHI 3456',
-    vehicleModel: 'Honda City 2021',
-    status: 'offline',
-    isApproved: true,
-    isSuspended: true,
-    isPending: false,
-    rating: 3.2,
-    totalRides: 120,
-    totalEarnings: 24000,
-    joinedAt: new Date('2024-04-05'),
-  },
-]

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Star, Clock } from 'lucide-react'
 import RideBookingCard from '@/components/rides/RideBookingCard'
@@ -12,98 +12,23 @@ import { TrendingSection } from '@/components/home/TrendingSection'
 import { RecentRides } from '@/components/rides/RecentRides'
 import { useAuthStore } from '@/store/authStore'
 import { OnboardingDialog } from '@/components/onboarding/OnboardingDialog'
+import { useMerchants } from '@/hooks/useMerchants'
+import type { Merchant } from '@/types'
 
-// Restaurant data with enhanced fields
-const featuredRestaurants = [
-  {
-    id: '1',
-    name: 'Jollibee',
-    image: 'https://images.unsplash.com/photo-1626645738196-c2a7c87a8f58?w=400&h=300&fit=crop',
-    rating: 4.8,
-    deliveryTime: '15-25',
-    deliveryFee: 0,
-    tags: ['Fast Food', 'Chicken'],
-    priceRange: 1,
-    orderCount: 1234,
-    trending: true
-  },
-  {
-    id: '2',
-    name: 'Mang Inasal',
-    image: 'https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?w=400&h=300&fit=crop',
-    rating: 4.6,
-    deliveryTime: '20-30',
-    deliveryFee: 29,
-    tags: ['Filipino', 'Chicken'],
-    priceRange: 1,
-    orderCount: 892,
-    trending: true
-  },
-  {
-    id: '3',
-    name: "McDonald's",
-    image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&h=300&fit=crop',
-    rating: 4.7,
-    deliveryTime: '15-25',
-    deliveryFee: 0,
-    tags: ['Fast Food', 'Burgers'],
-    priceRange: 1,
-    orderCount: 756,
-    trending: false
-  },
-  {
-    id: '4',
-    name: 'Chowking',
-    image: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=400&h=300&fit=crop',
-    rating: 4.5,
-    deliveryTime: '20-30',
-    deliveryFee: 39,
-    tags: ['Chinese', 'Asian'],
-    priceRange: 1,
-    orderCount: 543,
-    trending: false
+function merchantToCard(merchant: Merchant) {
+  return {
+    id: merchant.id,
+    name: merchant.name,
+    image: merchant.image || merchant.coverImage || merchant.logo || '',
+    rating: merchant.rating || 0,
+    deliveryTime: (merchant.deliveryTime || merchant.estimatedDelivery || '25-35').replace(' min', ''),
+    deliveryFee: merchant.deliveryFee || 0,
+    tags: merchant.categories || [],
+    priceRange: merchant.priceRange ? merchant.priceRange.length : 1,
+    orderCount: merchant.totalOrders || 0,
+    trending: merchant.isFeatured,
   }
-]
-
-const allRestaurants = [
-  ...featuredRestaurants,
-  {
-    id: '5',
-    name: 'Tokyo Tokyo',
-    image: 'https://images.unsplash.com/photo-1617196034796-73dfa7b1fd56?w=400&h=300&fit=crop',
-    rating: 4.4,
-    deliveryTime: '25-35',
-    deliveryFee: 49,
-    tags: ['Japanese', 'Asian'],
-    priceRange: 2,
-    orderCount: 321,
-    trending: false
-  },
-  {
-    id: '6',
-    name: 'KFC',
-    image: 'https://images.unsplash.com/photo-1606755962773-d324e0a13086?w=400&h=300&fit=crop',
-    rating: 4.5,
-    deliveryTime: '20-30',
-    deliveryFee: 39,
-    tags: ['Fast Food', 'Chicken'],
-    priceRange: 1,
-    orderCount: 678,
-    trending: false
-  },
-  {
-    id: '8',
-    name: 'Goldilocks',
-    image: 'https://images.unsplash.com/photo-1558301211-0d8c8ddee6ec?w=400&h=300&fit=crop',
-    rating: 4.3,
-    deliveryTime: '25-35',
-    deliveryFee: 29,
-    tags: ['Bakery', 'Snacks', 'Filipino'],
-    priceRange: 1,
-    orderCount: 289,
-    trending: false
-  }
-]
+}
 
 export default function Home() {
   const navigate = useNavigate()
@@ -111,6 +36,12 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState('')
   const [showOnboarding, setShowOnboarding] = useState(false)
   const { profile, isAuthenticated } = useAuthStore()
+
+  const { merchants: featuredMerchants, isLoading: featuredLoading } = useMerchants({ isFeatured: true, limitCount: 4 })
+  const { merchants: allMerchants, isLoading: allLoading } = useMerchants({ type: 'restaurant', limitCount: 20 })
+
+  const featuredRestaurants = useMemo(() => featuredMerchants.map(merchantToCard), [featuredMerchants])
+  const allRestaurants = useMemo(() => allMerchants.map(merchantToCard), [allMerchants])
 
   // Show onboarding dialog for new users
   useEffect(() => {
@@ -210,15 +141,25 @@ export default function Home() {
 
             {/* Horizontal scroll on mobile, grid on desktop */}
             <div className="flex lg:grid lg:grid-cols-4 gap-4 overflow-x-auto lg:overflow-visible hide-scrollbar snap-x snap-mandatory lg:snap-none pb-1 lg:pb-0">
-              {featuredRestaurants.map((restaurant) => (
-                <RestaurantCard
-                  key={restaurant.id}
-                  restaurant={restaurant}
-                  onClick={() => navigate(`/food/restaurant/${restaurant.id}`)}
-                  featured
-                  showMerienda={isMeriendaTime}
-                />
-              ))}
+              {featuredLoading ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="flex-shrink-0 w-[180px] lg:w-auto animate-pulse">
+                    <div className="aspect-[4/3] rounded-xl bg-gray-200" />
+                    <div className="mt-2 h-4 bg-gray-200 rounded w-3/4" />
+                    <div className="mt-1 h-3 bg-gray-200 rounded w-1/2" />
+                  </div>
+                ))
+              ) : featuredRestaurants.length > 0 ? (
+                featuredRestaurants.map((restaurant) => (
+                  <RestaurantCard
+                    key={restaurant.id}
+                    restaurant={restaurant}
+                    onClick={() => navigate(`/food/restaurant/${restaurant.id}`)}
+                    featured
+                    showMerienda={isMeriendaTime}
+                  />
+                ))
+              ) : null}
             </div>
           </section>
 
@@ -230,7 +171,19 @@ export default function Home() {
                 : `${selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1).replace('-', ' ')} Restaurants`}
             </h2>
 
-            {filteredRestaurants.length > 0 ? (
+            {allLoading ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="animate-pulse rounded-xl overflow-hidden">
+                    <div className="aspect-[16/9] bg-gray-200" />
+                    <div className="p-3 space-y-2">
+                      <div className="h-4 bg-gray-200 rounded w-3/4" />
+                      <div className="h-3 bg-gray-200 rounded w-1/2" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : filteredRestaurants.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredRestaurants.map((restaurant) => (
                   <RestaurantCard

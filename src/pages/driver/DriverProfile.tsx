@@ -107,8 +107,6 @@ export default function DriverProfile() {
       }
     } catch (error) {
       console.error('Error fetching profile:', error)
-      // Use mock data for demo
-      setProfile(MOCK_PROFILE)
     } finally {
       setLoading(false)
     }
@@ -426,32 +424,3 @@ export default function DriverProfile() {
   )
 }
 
-// Mock data for demo
-const MOCK_PROFILE: DriverProfile = {
-  displayName: 'Juan Dela Cruz',
-  email: 'juan@example.com',
-  phone: '+639123456789',
-  photoURL: undefined,
-  address: 'Quezon City, Metro Manila',
-  driverInfo: {
-    vehicleType: 'motorcycle',
-    vehiclePlate: 'ABC 1234',
-    vehicleModel: 'Honda Click 125i',
-    vehicleYear: '2023',
-    vehicleColor: 'Black',
-    licenseNumber: 'N01-23-456789',
-    licenseExpiry: new Date('2025-12-31'),
-    rating: 4.8,
-    totalRides: 1250,
-    totalEarnings: 125000,
-    completionRate: 98,
-    acceptanceRate: 92,
-    isApproved: true,
-    status: 'offline',
-    documents: {
-      license: '/doc.jpg',
-      registration: '/doc.jpg',
-      insurance: '/doc.jpg',
-    },
-  },
-}

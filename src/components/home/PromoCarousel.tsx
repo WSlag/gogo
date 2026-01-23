@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronRight, Clock } from 'lucide-react'
 import { cn } from '@/utils/cn'
+import { useActivePromos, type Promo } from '@/hooks/usePromos'
+import type { Timestamp } from 'firebase/firestore'
 
 interface FlashDeal {
   id: string
@@ -15,44 +17,32 @@ interface FlashDeal {
   tag?: string
 }
 
-// Mock flash deals data
-const mockFlashDeals: FlashDeal[] = [
-  {
-    id: '1',
-    restaurantId: '1',
-    restaurantName: 'Jollibee',
-    image: 'https://images.unsplash.com/photo-1626645738196-c2a7c87a8f58?w=400&h=300&fit=crop',
-    discount: '30%',
-    endsIn: 3600,
-    tag: 'Best Seller'
-  },
-  {
-    id: '2',
-    restaurantId: '2',
-    restaurantName: 'Mang Inasal',
-    image: 'https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?w=400&h=300&fit=crop',
-    discount: '25%',
-    endsIn: 7200,
-    tag: 'Popular'
-  },
-  {
-    id: '3',
-    restaurantId: '3',
-    restaurantName: "McDonald's",
-    image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&h=300&fit=crop',
-    discount: 'Free Delivery',
-    endsIn: 5400
-  },
-  {
-    id: '4',
-    restaurantId: '4',
-    restaurantName: 'Chowking',
-    image: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=400&h=300&fit=crop',
-    discount: '₱50 off',
-    endsIn: 1800,
-    tag: 'Ending Soon'
+function promoToFlashDeal(promo: Promo): FlashDeal {
+  const now = new Date()
+  const validUntil = promo.validUntil && typeof (promo.validUntil as Timestamp).toDate === 'function'
+    ? (promo.validUntil as Timestamp).toDate()
+    : new Date(promo.validUntil as unknown as string)
+  const endsIn = Math.max(0, Math.floor((validUntil.getTime() - now.getTime()) / 1000))
+
+  let discount = ''
+  if (promo.type === 'percentage') discount = `${promo.value}%`
+  else if (promo.type === 'fixed') discount = `₱${promo.value} off`
+  else if (promo.type === 'freeDelivery') discount = 'Free Delivery'
+
+  let tag: string | undefined
+  if (endsIn < 3600) tag = 'Ending Soon'
+  else if (promo.minOrderAmount) tag = `Min ₱${promo.minOrderAmount}`
+
+  return {
+    id: promo.id,
+    restaurantId: promo.merchantId || '',
+    restaurantName: promo.merchantName || promo.title || promo.description || promo.code,
+    image: promo.image || '',
+    discount,
+    endsIn,
+    tag,
   }
-]
+}
 
 interface PromoCarouselProps {
   className?: string
@@ -62,10 +52,20 @@ interface PromoCarouselProps {
 export function PromoCarousel({ className, onSeeAll }: PromoCarouselProps) {
   const navigate = useNavigate()
   const scrollRef = useRef<HTMLDivElement>(null)
-  const [deals, setDeals] = useState(mockFlashDeals)
+  const { data: promos, isLoading } = useActivePromos(6)
+  const [deals, setDeals] = useState<FlashDeal[]>([])
+
+  // Convert promos to flash deals when data loads
+  useEffect(() => {
+    if (promos && promos.length > 0) {
+      setDeals(promos.map(promoToFlashDeal))
+    }
+  }, [promos])
 
   // Update countdown every second
   useEffect(() => {
+    if (deals.length === 0) return
+
     const interval = setInterval(() => {
       setDeals((prev) =>
         prev.map((deal) => ({
@@ -76,10 +76,14 @@ export function PromoCarousel({ className, onSeeAll }: PromoCarouselProps) {
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [])
+  }, [deals.length])
 
   const handleDealClick = (deal: FlashDeal) => {
     navigate(`/food/restaurant/${deal.restaurantId}`)
+  }
+
+  if (!isLoading && deals.length === 0) {
+    return null
   }
 
   return (

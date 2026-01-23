@@ -124,8 +124,8 @@ export default function AdminMerchants() {
       setMerchants(filtered)
     } catch (error) {
       console.error('Error fetching merchants:', error)
-      // Use mock data for demo
-      setMerchants(MOCK_MERCHANTS)
+      setMerchants([])
+      setMessage({ type: 'error', text: 'Failed to load merchants. Pull down to retry.' })
     } finally {
       setLoading(false)
     }
@@ -728,78 +728,3 @@ export default function AdminMerchants() {
   )
 }
 
-// Mock data for demo
-const MOCK_MERCHANTS: Merchant[] = [
-  {
-    id: '1',
-    businessName: 'Jollibee - SM City',
-    ownerName: 'Tony Tan Caktiong',
-    email: 'jollibee@example.com',
-    phone: '+639123456789',
-    category: 'restaurant',
-    address: 'SM City Manila, Ground Floor',
-    status: 'open',
-    isApproved: true,
-    isSuspended: false,
-    isPending: false,
-    rating: 4.7,
-    totalOrders: 15420,
-    totalRevenue: 7850000,
-    commissionRate: 15,
-    joinedAt: new Date('2024-01-01'),
-  },
-  {
-    id: '2',
-    businessName: 'Puregold Price Club',
-    ownerName: 'Lucio Co',
-    email: 'puregold@example.com',
-    phone: '+639987654321',
-    category: 'grocery',
-    address: 'Shaw Blvd, Mandaluyong',
-    status: 'open',
-    isApproved: true,
-    isSuspended: false,
-    isPending: false,
-    rating: 4.5,
-    totalOrders: 8900,
-    totalRevenue: 4500000,
-    commissionRate: 12,
-    joinedAt: new Date('2024-02-15'),
-  },
-  {
-    id: '3',
-    businessName: 'New Sari-Sari Store',
-    ownerName: 'Maria Santos',
-    email: 'saristore@example.com',
-    phone: '+639555123456',
-    category: 'convenience',
-    address: 'Taft Avenue, Manila',
-    status: 'closed',
-    isApproved: false,
-    isSuspended: false,
-    isPending: true,
-    rating: 0,
-    totalOrders: 0,
-    totalRevenue: 0,
-    commissionRate: 10,
-    joinedAt: new Date('2024-03-01'),
-  },
-  {
-    id: '4',
-    businessName: 'Mercury Drug - Makati',
-    ownerName: 'Pharmacist Name',
-    email: 'mercury@example.com',
-    phone: '+639777888999',
-    category: 'pharmacy',
-    address: 'Ayala Ave, Makati',
-    status: 'closed',
-    isApproved: true,
-    isSuspended: false,
-    isPending: false,
-    rating: 4.8,
-    totalOrders: 3200,
-    totalRevenue: 980000,
-    commissionRate: 8,
-    joinedAt: new Date('2024-04-10'),
-  },
-]

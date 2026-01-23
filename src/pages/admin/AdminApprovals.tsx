@@ -159,8 +159,7 @@ export default function AdminApprovals() {
       setApplications([...driverApps, ...merchantApps])
     } catch (error) {
       console.error('Error fetching applications:', error)
-      // Use mock data for demo
-      setApplications(MOCK_APPLICATIONS)
+      setApplications([])
     } finally {
       setLoading(false)
     }
@@ -562,66 +561,3 @@ export default function AdminApprovals() {
   )
 }
 
-// Mock data for demo
-const MOCK_APPLICATIONS: Application[] = [
-  {
-    id: '1',
-    type: 'driver',
-    name: 'Roberto Cruz',
-    email: 'roberto@example.com',
-    phone: '+639123456789',
-    vehicleType: 'motorcycle',
-    vehiclePlate: 'ABC 1234',
-    vehicleModel: 'Honda Click 125i',
-    vehicleYear: '2023',
-    licenseNumber: 'N01-23-456789',
-    address: 'Quezon City, Metro Manila',
-    submittedAt: new Date(Date.now() - 86400000),
-    documents: {
-      license: '/placeholder-doc.jpg',
-      registration: '/placeholder-doc.jpg',
-      insurance: '/placeholder-doc.jpg',
-      nbi: '/placeholder-doc.jpg',
-      photo: '/placeholder-doc.jpg',
-    },
-  },
-  {
-    id: '2',
-    type: 'merchant',
-    businessName: 'Karinderia ni Aling Nena',
-    ownerName: 'Nena Santos',
-    email: 'nena@example.com',
-    phone: '+639987654321',
-    category: 'restaurant',
-    address: 'Taft Avenue, Manila',
-    submittedAt: new Date(Date.now() - 172800000),
-    documents: {
-      businessPermit: '/placeholder-doc.jpg',
-      sanitaryPermit: '/placeholder-doc.jpg',
-      bir: '/placeholder-doc.jpg',
-      validId: '/placeholder-doc.jpg',
-      photo: '/placeholder-doc.jpg',
-    },
-  },
-  {
-    id: '3',
-    type: 'driver',
-    name: 'Mark Gonzales',
-    email: 'mark@example.com',
-    phone: '+639555123456',
-    vehicleType: 'car',
-    vehiclePlate: 'XYZ 5678',
-    vehicleModel: 'Toyota Vios',
-    vehicleYear: '2022',
-    licenseNumber: 'N02-22-789012',
-    address: 'Makati City',
-    submittedAt: new Date(Date.now() - 259200000),
-    documents: {
-      license: '/placeholder-doc.jpg',
-      registration: '/placeholder-doc.jpg',
-      insurance: '/placeholder-doc.jpg',
-      nbi: '/placeholder-doc.jpg',
-      photo: '/placeholder-doc.jpg',
-    },
-  },
-]
