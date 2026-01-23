@@ -21,11 +21,11 @@ import {
   ToggleRight,
 } from 'lucide-react'
 import { Card, Button, Modal, Input, Spinner } from '@/components/ui'
-import { useAuthStore } from '@/store/authStore'
 import { doc, getDoc, updateDoc, Timestamp } from 'firebase/firestore'
 import { db } from '@/services/firebase/config'
 import { useMerchantImageUpload } from '@/hooks/useImageUpload'
 import { useMerchantApplication } from '@/hooks/useMerchantApplication'
+import type { OperatingHours } from '@/types/merchant'
 
 interface MerchantSettings {
   businessName: string
@@ -57,9 +57,58 @@ interface MerchantSettings {
 
 type DayOfWeek = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday'
 
+const DEFAULT_OPERATING_HOURS: MerchantSettings['operatingHours'] = {
+  monday: { open: '08:00', close: '22:00', isOpen: true },
+  tuesday: { open: '08:00', close: '22:00', isOpen: true },
+  wednesday: { open: '08:00', close: '22:00', isOpen: true },
+  thursday: { open: '08:00', close: '22:00', isOpen: true },
+  friday: { open: '08:00', close: '22:00', isOpen: true },
+  saturday: { open: '08:00', close: '22:00', isOpen: true },
+  sunday: { open: '09:00', close: '21:00', isOpen: true },
+}
+
+const DAY_NAMES: DayOfWeek[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+
+function mapOperatingHours(raw: unknown): MerchantSettings['operatingHours'] {
+  if (!raw) return { ...DEFAULT_OPERATING_HOURS }
+
+  // Record format from registration: { monday: { open, close, isOpen } }
+  if (typeof raw === 'object' && !Array.isArray(raw)) {
+    const record = raw as Record<string, { open?: string; close?: string; isOpen?: boolean }>
+    const result = { ...DEFAULT_OPERATING_HOURS }
+    for (const day of Object.keys(result) as DayOfWeek[]) {
+      if (record[day]) {
+        result[day] = {
+          open: record[day].open || '08:00',
+          close: record[day].close || '22:00',
+          isOpen: record[day].isOpen !== undefined ? record[day].isOpen! : true,
+        }
+      }
+    }
+    return result
+  }
+
+  // Array format: [{ day: 0-6, open, close, isClosed }]
+  if (Array.isArray(raw)) {
+    const result = { ...DEFAULT_OPERATING_HOURS }
+    for (const entry of raw as OperatingHours[]) {
+      const dayName = DAY_NAMES[entry.day]
+      if (dayName) {
+        result[dayName] = {
+          open: entry.open || '08:00',
+          close: entry.close || '22:00',
+          isOpen: !entry.isClosed,
+        }
+      }
+    }
+    return result
+  }
+
+  return { ...DEFAULT_OPERATING_HOURS }
+}
+
 export default function MerchantSettings() {
   const navigate = useNavigate()
-  const { user } = useAuthStore()
   const [settings, setSettings] = useState<MerchantSettings | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -69,35 +118,66 @@ export default function MerchantSettings() {
   const [showHoursModal, setShowHoursModal] = useState(false)
 
   // Image upload
-  const { merchantData } = useMerchantApplication()
+  const { merchantData, isLoading: applicationLoading } = useMerchantApplication()
   const merchantId = merchantData?.id || ''
   const { uploadBannerImage, uploadState } = useMerchantImageUpload(merchantId)
   const isUploading = uploadState.status === 'uploading'
 
   useEffect(() => {
-    fetchSettings()
-  }, [user])
+    if (merchantId) {
+      fetchSettings()
+    }
+  }, [merchantId])
 
   const fetchSettings = async () => {
+    if (!merchantId) return
     setLoading(true)
     try {
-      // In real app, fetch from merchants collection
-      // For demo, use mock data
-      setSettings(MOCK_SETTINGS)
+      const merchantRef = doc(db, 'merchants', merchantId)
+      const merchantSnap = await getDoc(merchantRef)
+
+      if (merchantSnap.exists()) {
+        const data = merchantSnap.data()
+        const mappedSettings: MerchantSettings = {
+          businessName: data.businessName || data.name || '',
+          ownerName: data.ownerName || '',
+          email: data.email || '',
+          phone: data.phone || '',
+          address: data.address || '',
+          photoURL: data.photoURL || data.logo || data.coverImage || '',
+          category: data.category || data.type || '',
+          description: data.description || '',
+          operatingHours: mapOperatingHours(data.operatingHours),
+          settings: {
+            autoAcceptOrders: data.settings?.autoAcceptOrders ?? false,
+            notifications: data.settings?.notifications ?? true,
+            soundAlerts: data.settings?.soundAlerts ?? true,
+            preparationTime: data.settings?.preparationTime ?? 15,
+            minimumOrder: data.settings?.minimumOrder ?? 100,
+            deliveryRadius: data.settings?.deliveryRadius ?? 5,
+          },
+        }
+        setSettings(mappedSettings)
+      } else {
+        console.error('Merchant document not found for ID:', merchantId)
+        setSettings(null)
+      }
     } catch (error) {
       console.error('Error fetching settings:', error)
-      setSettings(MOCK_SETTINGS)
+      setSettings(null)
     } finally {
       setLoading(false)
     }
   }
 
   const handleSaveField = async () => {
-    if (!settings) return
+    if (!settings || !merchantId) return
     setSaving(true)
     try {
-      // Update in Firestore
-      // await updateDoc(doc(db, 'merchants', merchantId), { [editField]: editValue })
+      await updateDoc(doc(db, 'merchants', merchantId), {
+        [editField]: editValue,
+        updatedAt: Timestamp.now(),
+      })
 
       setSettings((prev) => {
         if (!prev) return null
@@ -112,8 +192,10 @@ export default function MerchantSettings() {
   }
 
   const handleToggleSetting = async (key: keyof MerchantSettings['settings']) => {
-    if (!settings) return
+    if (!settings || !merchantId) return
     const newValue = !settings.settings[key]
+
+    // Optimistic update
     setSettings((prev) => {
       if (!prev) return null
       return {
@@ -121,24 +203,74 @@ export default function MerchantSettings() {
         settings: { ...prev.settings, [key]: newValue },
       }
     })
-    // Save to Firestore
+
+    try {
+      await updateDoc(doc(db, 'merchants', merchantId), {
+        [`settings.${key}`]: newValue,
+        updatedAt: Timestamp.now(),
+      })
+    } catch (error) {
+      console.error('Error saving setting:', error)
+      // Revert on failure
+      setSettings((prev) => {
+        if (!prev) return null
+        return {
+          ...prev,
+          settings: { ...prev.settings, [key]: !newValue },
+        }
+      })
+    }
   }
 
-  const handleToggleDay = (day: DayOfWeek) => {
-    if (!settings) return
+  const handleToggleDay = async (day: DayOfWeek) => {
+    if (!settings || !merchantId) return
+    const newIsOpen = !settings.operatingHours[day].isOpen
+
     setSettings((prev) => {
       if (!prev) return null
       return {
         ...prev,
         operatingHours: {
           ...prev.operatingHours,
-          [day]: {
-            ...prev.operatingHours[day],
-            isOpen: !prev.operatingHours[day].isOpen,
-          },
+          [day]: { ...prev.operatingHours[day], isOpen: newIsOpen },
         },
       }
     })
+
+    try {
+      await updateDoc(doc(db, 'merchants', merchantId), {
+        [`operatingHours.${day}.isOpen`]: newIsOpen,
+        updatedAt: Timestamp.now(),
+      })
+    } catch (error) {
+      console.error('Error toggling day:', error)
+      setSettings((prev) => {
+        if (!prev) return null
+        return {
+          ...prev,
+          operatingHours: {
+            ...prev.operatingHours,
+            [day]: { ...prev.operatingHours[day], isOpen: !newIsOpen },
+          },
+        }
+      })
+    }
+  }
+
+  const handleSaveHours = async () => {
+    if (!settings || !merchantId) return
+    setSaving(true)
+    try {
+      await updateDoc(doc(db, 'merchants', merchantId), {
+        operatingHours: settings.operatingHours,
+        updatedAt: Timestamp.now(),
+      })
+      setShowHoursModal(false)
+    } catch (error) {
+      console.error('Error saving hours:', error)
+    } finally {
+      setSaving(false)
+    }
   }
 
   const openEditModal = (field: string, value: string) => {
@@ -172,7 +304,7 @@ export default function MerchantSettings() {
     e.target.value = ''
   }
 
-  if (loading) {
+  if (loading || applicationLoading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="animate-spin h-8 w-8 border-4 border-primary-500 border-t-transparent rounded-full" />
@@ -528,7 +660,7 @@ export default function MerchantSettings() {
               </div>
             )
           })}
-          <Button fullWidth onClick={() => setShowHoursModal(false)}>
+          <Button fullWidth onClick={handleSaveHours} isLoading={saving}>
             <Save className="h-4 w-4 mr-2" />
             Save Hours
           </Button>
@@ -538,30 +670,3 @@ export default function MerchantSettings() {
   )
 }
 
-// Mock data
-const MOCK_SETTINGS: MerchantSettings = {
-  businessName: 'Jollibee - SM City',
-  ownerName: 'Tony Tan Caktiong',
-  email: 'jollibee@example.com',
-  phone: '+639123456789',
-  address: 'SM City Manila, Ground Floor',
-  category: 'restaurant',
-  description: 'Home of the famous Chickenjoy',
-  operatingHours: {
-    monday: { open: '08:00', close: '22:00', isOpen: true },
-    tuesday: { open: '08:00', close: '22:00', isOpen: true },
-    wednesday: { open: '08:00', close: '22:00', isOpen: true },
-    thursday: { open: '08:00', close: '22:00', isOpen: true },
-    friday: { open: '08:00', close: '23:00', isOpen: true },
-    saturday: { open: '08:00', close: '23:00', isOpen: true },
-    sunday: { open: '09:00', close: '21:00', isOpen: true },
-  },
-  settings: {
-    autoAcceptOrders: true,
-    notifications: true,
-    soundAlerts: true,
-    preparationTime: 15,
-    minimumOrder: 100,
-    deliveryRadius: 5,
-  },
-}
