@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -16,77 +16,172 @@ import {
 } from 'lucide-react'
 import { PesoSign } from '@/components/icons'
 import { Card, Badge } from '@/components/ui'
-
-interface AnalyticsData {
-  overview: {
-    totalRevenue: number
-    totalOrders: number
-    avgOrderValue: number
-    totalCustomers: number
-    avgRating: number
-    avgPrepTime: number
-    revenueGrowth: number
-    ordersGrowth: number
-  }
-  topItems: Array<{
-    id: string
-    name: string
-    orders: number
-    revenue: number
-    rating: number
-  }>
-  hourlyOrders: Array<{ hour: number; orders: number }>
-  ordersByDay: Array<{ day: string; orders: number; revenue: number }>
-  customerInsights: {
-    newCustomers: number
-    returningCustomers: number
-    avgOrdersPerCustomer: number
-  }
-  ratings: {
-    average: number
-    distribution: { [key: number]: number }
-    totalReviews: number
-  }
-  peakHours: Array<{ hour: string; orders: number }>
-}
+import { useMerchantApplication } from '@/hooks/useMerchantApplication'
+import { useMerchantOrders } from '@/hooks/useMerchantOrders'
+import type { Order } from '@/types'
 
 type TimeRange = 'week' | 'month' | 'year'
 
+function getOrderDate(order: Order): Date {
+  if (order.createdAt && typeof order.createdAt.toDate === 'function') {
+    return order.createdAt.toDate()
+  }
+  return new Date(0)
+}
+
 export default function MerchantAnalytics() {
   const navigate = useNavigate()
-  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null)
-  const [loading, setLoading] = useState(true)
   const [selectedRange, setSelectedRange] = useState<TimeRange>('week')
 
-  useEffect(() => {
-    fetchAnalytics()
-  }, [selectedRange])
+  const { merchantData, isLoading: appLoading } = useMerchantApplication()
+  const merchantId = merchantData?.id || ''
+  const { orders, isLoading: ordersLoading } = useMerchantOrders({
+    merchantId,
+    merchantUserId: merchantData?.userId,
+    limitCount: 500,
+  })
 
-  const fetchAnalytics = async () => {
-    setLoading(true)
-    try {
-      // In real app, fetch from Firestore/analytics service
-      setAnalytics(MOCK_ANALYTICS)
-    } catch (error) {
-      console.error('Error fetching analytics:', error)
-      setAnalytics(MOCK_ANALYTICS)
-    } finally {
-      setLoading(false)
+  const loading = appLoading || ordersLoading
+
+  const analytics = useMemo(() => {
+    const now = new Date()
+    let rangeStart: Date
+
+    if (selectedRange === 'week') {
+      rangeStart = new Date(now)
+      rangeStart.setDate(rangeStart.getDate() - 7)
+      rangeStart.setHours(0, 0, 0, 0)
+    } else if (selectedRange === 'month') {
+      rangeStart = new Date(now.getFullYear(), now.getMonth(), 1)
+    } else {
+      rangeStart = new Date(now.getFullYear(), 0, 1)
     }
-  }
+
+    const completedOrders = orders.filter(o => o.status !== 'cancelled')
+    const filteredOrders = completedOrders.filter(o => getOrderDate(o) >= rangeStart)
+
+    // Overview
+    const totalRevenue = filteredOrders.reduce((s, o) => s + (o.total || 0), 0)
+    const totalOrders = filteredOrders.length
+    const avgOrderValue = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0
+
+    const customerIds = new Set(filteredOrders.map(o => o.customerId).filter(Boolean))
+    const totalCustomers = customerIds.size
+
+    const ratedOrders = filteredOrders.filter(o => o.rating && o.rating > 0)
+    const avgRating = ratedOrders.length > 0
+      ? ratedOrders.reduce((s, o) => s + (o.rating || 0), 0) / ratedOrders.length
+      : 0
+
+    const avgOrdersPerCustomer = totalCustomers > 0 ? totalOrders / totalCustomers : 0
+
+    // Top Items - aggregate from order items
+    const itemMap = new Map<string, { orders: number; revenue: number; ratings: number[]; id: string }>()
+    filteredOrders.forEach((order, idx) => {
+      order.items?.forEach(item => {
+        const key = item.name || item.productId || `item-${idx}`
+        const existing = itemMap.get(key) || { orders: 0, revenue: 0, ratings: [], id: item.productId || key }
+        existing.orders += item.quantity || 1
+        existing.revenue += (item.price || 0) * (item.quantity || 1)
+        if (order.rating) existing.ratings.push(order.rating)
+        itemMap.set(key, existing)
+      })
+    })
+    const topItems = [...itemMap.entries()]
+      .sort((a, b) => b[1].revenue - a[1].revenue)
+      .slice(0, 5)
+      .map(([name, data]) => ({
+        id: data.id,
+        name,
+        orders: data.orders,
+        revenue: data.revenue,
+        rating: data.ratings.length > 0 ? data.ratings.reduce((a, b) => a + b, 0) / data.ratings.length : 0,
+      }))
+
+    // Hourly Orders (6AM to 11PM)
+    const hourlyMap = new Map<number, number>()
+    for (let h = 6; h <= 23; h++) hourlyMap.set(h, 0)
+    filteredOrders.forEach(o => {
+      const hour = getOrderDate(o).getHours()
+      if (hour >= 6 && hour <= 23) {
+        hourlyMap.set(hour, (hourlyMap.get(hour) || 0) + 1)
+      }
+    })
+    const hourlyOrders = [...hourlyMap.entries()].map(([hour, count]) => ({ hour, orders: count }))
+
+    // Orders by Day of week
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    const dayMap = new Map<string, { orders: number; revenue: number }>()
+    dayNames.forEach(d => dayMap.set(d, { orders: 0, revenue: 0 }))
+    filteredOrders.forEach(o => {
+      const day = dayNames[getOrderDate(o).getDay()]
+      const existing = dayMap.get(day)!
+      existing.orders += 1
+      existing.revenue += o.total || 0
+    })
+    const ordersByDay = dayNames.map(day => ({ day, ...dayMap.get(day)! }))
+
+    // Customer Insights - approximate new vs returning
+    const allCustomerIds = new Set(completedOrders.map(o => o.customerId).filter(Boolean))
+    const priorOrders = completedOrders.filter(o => getOrderDate(o) < rangeStart)
+    const priorCustomerIds = new Set(priorOrders.map(o => o.customerId).filter(Boolean))
+    const currentCustomerIds = new Set(filteredOrders.map(o => o.customerId).filter(Boolean))
+    let newCustomers = 0
+    let returningCustomers = 0
+    currentCustomerIds.forEach(id => {
+      if (priorCustomerIds.has(id)) returningCustomers++
+      else newCustomers++
+    })
+
+    // Rating Distribution
+    const distribution: { [key: number]: number } = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+    ratedOrders.forEach(o => {
+      const star = Math.round(o.rating || 0)
+      if (star >= 1 && star <= 5) distribution[star]++
+    })
+    const totalReviews = ratedOrders.length
+
+    // Peak Hours (top 4)
+    const peakHours = [...hourlyOrders]
+      .sort((a, b) => b.orders - a.orders)
+      .slice(0, 4)
+      .map(h => ({
+        hour: `${h.hour > 12 ? h.hour - 12 : h.hour} ${h.hour >= 12 ? 'PM' : 'AM'}`,
+        orders: h.orders,
+      }))
+
+    return {
+      overview: {
+        totalRevenue,
+        totalOrders,
+        avgOrderValue,
+        totalCustomers,
+        avgRating,
+        avgPrepTime: 0,
+        revenueGrowth: 0,
+        ordersGrowth: 0,
+      },
+      topItems,
+      hourlyOrders,
+      ordersByDay,
+      customerInsights: {
+        newCustomers,
+        returningCustomers,
+        avgOrdersPerCustomer: Math.round(avgOrdersPerCustomer * 10) / 10,
+      },
+      ratings: {
+        average: avgRating,
+        distribution,
+        totalReviews,
+      },
+      peakHours,
+    }
+  }, [orders, selectedRange])
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="animate-spin h-8 w-8 border-4 border-primary-500 border-t-transparent rounded-full" />
-      </div>
-    )
-  }
-
-  if (!analytics) {
-    return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <p className="text-gray-500">Analytics not available</p>
       </div>
     )
   }
@@ -274,14 +369,14 @@ export default function MerchantAnalytics() {
               <div
                 className="bg-green-500 h-full"
                 style={{
-                  width: `${(analytics.customerInsights.newCustomers / (analytics.customerInsights.newCustomers + analytics.customerInsights.returningCustomers)) * 100}%`,
+                  width: `${(analytics.customerInsights.newCustomers + analytics.customerInsights.returningCustomers) > 0 ? (analytics.customerInsights.newCustomers / (analytics.customerInsights.newCustomers + analytics.customerInsights.returningCustomers)) * 100 : 50}%`,
                 }}
               />
               <div className="bg-blue-500 h-full flex-1" />
             </div>
             <div className="flex justify-between mt-1 text-xs">
-              <span className="text-green-600">New {Math.round((analytics.customerInsights.newCustomers / (analytics.customerInsights.newCustomers + analytics.customerInsights.returningCustomers)) * 100)}%</span>
-              <span className="text-blue-600">Returning {Math.round((analytics.customerInsights.returningCustomers / (analytics.customerInsights.newCustomers + analytics.customerInsights.returningCustomers)) * 100)}%</span>
+              <span className="text-green-600">New {(analytics.customerInsights.newCustomers + analytics.customerInsights.returningCustomers) > 0 ? Math.round((analytics.customerInsights.newCustomers / (analytics.customerInsights.newCustomers + analytics.customerInsights.returningCustomers)) * 100) : 0}%</span>
+              <span className="text-blue-600">Returning {(analytics.customerInsights.newCustomers + analytics.customerInsights.returningCustomers) > 0 ? Math.round((analytics.customerInsights.returningCustomers / (analytics.customerInsights.newCustomers + analytics.customerInsights.returningCustomers)) * 100) : 0}%</span>
             </div>
           </div>
         </Card>
@@ -308,7 +403,7 @@ export default function MerchantAnalytics() {
             <div className="flex-1 space-y-1">
               {[5, 4, 3, 2, 1].map((star) => {
                 const count = analytics.ratings.distribution[star] || 0
-                const percentage = (count / analytics.ratings.totalReviews) * 100
+                const percentage = analytics.ratings.totalReviews > 0 ? (count / analytics.ratings.totalReviews) * 100 : 0
                 return (
                   <div key={star} className="flex items-center gap-2">
                     <span className="text-xs text-gray-500 w-4">{star}</span>
@@ -349,68 +444,3 @@ export default function MerchantAnalytics() {
   )
 }
 
-// Mock data
-const MOCK_ANALYTICS: AnalyticsData = {
-  overview: {
-    totalRevenue: 425000,
-    totalOrders: 1250,
-    avgOrderValue: 340,
-    totalCustomers: 890,
-    avgRating: 4.7,
-    avgPrepTime: 12,
-    revenueGrowth: 15,
-    ordersGrowth: 12,
-  },
-  topItems: [
-    { id: '1', name: 'Chickenjoy 2pc with Rice', orders: 450, revenue: 85050, rating: 4.8 },
-    { id: '2', name: 'Jolly Spaghetti Family', orders: 320, revenue: 51200, rating: 4.7 },
-    { id: '3', name: 'Burger Steak 2pc', orders: 280, revenue: 39200, rating: 4.6 },
-    { id: '4', name: 'Yum Burger', orders: 250, revenue: 17500, rating: 4.5 },
-    { id: '5', name: 'Peach Mango Pie', orders: 200, revenue: 8000, rating: 4.9 },
-  ],
-  hourlyOrders: [
-    { hour: 6, orders: 5 },
-    { hour: 7, orders: 12 },
-    { hour: 8, orders: 25 },
-    { hour: 9, orders: 30 },
-    { hour: 10, orders: 35 },
-    { hour: 11, orders: 65 },
-    { hour: 12, orders: 120 },
-    { hour: 13, orders: 95 },
-    { hour: 14, orders: 45 },
-    { hour: 15, orders: 35 },
-    { hour: 16, orders: 40 },
-    { hour: 17, orders: 55 },
-    { hour: 18, orders: 110 },
-    { hour: 19, orders: 130 },
-    { hour: 20, orders: 85 },
-    { hour: 21, orders: 50 },
-    { hour: 22, orders: 25 },
-    { hour: 23, orders: 10 },
-  ],
-  ordersByDay: [
-    { day: 'Mon', orders: 165, revenue: 56100 },
-    { day: 'Tue', orders: 180, revenue: 61200 },
-    { day: 'Wed', orders: 175, revenue: 59500 },
-    { day: 'Thu', orders: 190, revenue: 64600 },
-    { day: 'Fri', orders: 220, revenue: 74800 },
-    { day: 'Sat', orders: 180, revenue: 61200 },
-    { day: 'Sun', orders: 140, revenue: 47600 },
-  ],
-  customerInsights: {
-    newCustomers: 245,
-    returningCustomers: 645,
-    avgOrdersPerCustomer: 1.4,
-  },
-  ratings: {
-    average: 4.7,
-    distribution: { 5: 580, 4: 320, 3: 85, 2: 15, 1: 5 },
-    totalReviews: 1005,
-  },
-  peakHours: [
-    { hour: '12 PM', orders: 120 },
-    { hour: '1 PM', orders: 95 },
-    { hour: '7 PM', orders: 130 },
-    { hour: '8 PM', orders: 85 },
-  ],
-}

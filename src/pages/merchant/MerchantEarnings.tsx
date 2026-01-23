@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -17,80 +17,130 @@ import {
 } from 'lucide-react'
 import { PesoSign } from '@/components/icons'
 import { Card, Badge, Button, Modal } from '@/components/ui'
+import { useMerchantApplication } from '@/hooks/useMerchantApplication'
+import { useMerchantOrders } from '@/hooks/useMerchantOrders'
+import type { Order } from '@/types'
 
-interface EarningsData {
-  today: {
-    revenue: number
-    orders: number
-    avgOrderValue: number
-    commission: number
-    netEarnings: number
-  }
-  weekly: {
-    revenue: number
-    orders: number
-    trend: number
-    dailyData: Array<{ date: string; revenue: number; orders: number }>
-  }
-  monthly: {
-    revenue: number
-    orders: number
-    trend: number
-    commission: number
-    netEarnings: number
-  }
-  pending: {
-    amount: number
-    nextPayout: Date
-  }
-  transactions: Array<{
-    id: string
-    type: 'order' | 'payout' | 'refund' | 'commission'
-    description: string
-    amount: number
-    date: Date
-    status: 'completed' | 'pending' | 'failed'
-  }>
-}
+const COMMISSION_RATE = 0.15
 
 type TimeRange = 'today' | 'week' | 'month'
 
+function getOrderDate(order: Order): Date {
+  if (order.createdAt && typeof order.createdAt.toDate === 'function') {
+    return order.createdAt.toDate()
+  }
+  return new Date(0)
+}
+
 export default function MerchantEarnings() {
   const navigate = useNavigate()
-  const [earnings, setEarnings] = useState<EarningsData | null>(null)
-  const [loading, setLoading] = useState(true)
   const [selectedRange, setSelectedRange] = useState<TimeRange>('today')
   const [showPayoutModal, setShowPayoutModal] = useState(false)
 
-  useEffect(() => {
-    fetchEarnings()
-  }, [])
+  const { merchantData, isLoading: appLoading } = useMerchantApplication()
+  const merchantId = merchantData?.id || ''
+  const { orders, isLoading: ordersLoading } = useMerchantOrders({
+    merchantId,
+    merchantUserId: merchantData?.userId,
+    limitCount: 500,
+  })
 
-  const fetchEarnings = async () => {
-    setLoading(true)
-    try {
-      // In real app, fetch from Firestore
-      setEarnings(MOCK_EARNINGS)
-    } catch (error) {
-      console.error('Error fetching earnings:', error)
-      setEarnings(MOCK_EARNINGS)
-    } finally {
-      setLoading(false)
+  const loading = appLoading || ordersLoading
+
+  const earnings = useMemo(() => {
+    const completedOrders = orders.filter(o => o.status !== 'cancelled')
+
+    const now = new Date()
+    const todayStart = new Date(now)
+    todayStart.setHours(0, 0, 0, 0)
+
+    const weekStart = new Date(now)
+    weekStart.setDate(weekStart.getDate() - 7)
+    weekStart.setHours(0, 0, 0, 0)
+
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+
+    // Today
+    const todayOrders = completedOrders.filter(o => getOrderDate(o) >= todayStart)
+    const todayRevenue = todayOrders.reduce((s, o) => s + (o.total || 0), 0)
+    const todayCommission = Math.round(todayRevenue * COMMISSION_RATE)
+
+    // Weekly
+    const weekOrders = completedOrders.filter(o => getOrderDate(o) >= weekStart)
+    const weekRevenue = weekOrders.reduce((s, o) => s + (o.total || 0), 0)
+
+    // Build daily breakdown for the last 7 days
+    const dailyData: Array<{ date: string; revenue: number; orders: number }> = []
+    for (let i = 6; i >= 0; i--) {
+      const dayStart = new Date(now)
+      dayStart.setDate(dayStart.getDate() - i)
+      dayStart.setHours(0, 0, 0, 0)
+      const dayEnd = new Date(dayStart)
+      dayEnd.setDate(dayEnd.getDate() + 1)
+
+      const dayOrders = completedOrders.filter(o => {
+        const d = getOrderDate(o)
+        return d >= dayStart && d < dayEnd
+      })
+      dailyData.push({
+        date: dayStart.toISOString().split('T')[0],
+        revenue: dayOrders.reduce((s, o) => s + (o.total || 0), 0),
+        orders: dayOrders.length,
+      })
     }
-  }
+
+    // Monthly
+    const monthOrders = completedOrders.filter(o => getOrderDate(o) >= monthStart)
+    const monthRevenue = monthOrders.reduce((s, o) => s + (o.total || 0), 0)
+    const monthCommission = Math.round(monthRevenue * COMMISSION_RATE)
+
+    // Transactions from recent completed orders
+    const recentOrders = [...completedOrders]
+      .sort((a, b) => getOrderDate(b).getTime() - getOrderDate(a).getTime())
+      .slice(0, 5)
+
+    const transactions = recentOrders.map((o, i) => ({
+      id: o.id || String(i),
+      type: 'order' as const,
+      description: `Order #${o.id?.slice(-4)?.toUpperCase() || i}`,
+      amount: o.total || 0,
+      date: getOrderDate(o),
+      status: 'completed' as const,
+    }))
+
+    return {
+      today: {
+        revenue: todayRevenue,
+        orders: todayOrders.length,
+        avgOrderValue: todayOrders.length > 0 ? Math.round(todayRevenue / todayOrders.length) : 0,
+        commission: todayCommission,
+        netEarnings: todayRevenue - todayCommission,
+      },
+      weekly: {
+        revenue: weekRevenue,
+        orders: weekOrders.length,
+        trend: 0,
+        dailyData,
+      },
+      monthly: {
+        revenue: monthRevenue,
+        orders: monthOrders.length,
+        trend: 0,
+        commission: monthCommission,
+        netEarnings: monthRevenue - monthCommission,
+      },
+      pending: {
+        amount: 0,
+        nextPayout: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
+      },
+      transactions,
+    }
+  }, [orders])
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="animate-spin h-8 w-8 border-4 border-primary-500 border-t-transparent rounded-full" />
-      </div>
-    )
-  }
-
-  if (!earnings) {
-    return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <p className="text-gray-500">Earnings data not available</p>
       </div>
     )
   }
@@ -373,45 +423,3 @@ export default function MerchantEarnings() {
   )
 }
 
-// Mock data
-const MOCK_EARNINGS: EarningsData = {
-  today: {
-    revenue: 15420,
-    orders: 42,
-    avgOrderValue: 367,
-    commission: 2313,
-    netEarnings: 13107,
-  },
-  weekly: {
-    revenue: 98500,
-    orders: 285,
-    trend: 12,
-    dailyData: [
-      { date: '2024-01-07', revenue: 12500, orders: 35 },
-      { date: '2024-01-08', revenue: 14200, orders: 42 },
-      { date: '2024-01-09', revenue: 13800, orders: 38 },
-      { date: '2024-01-10', revenue: 16500, orders: 48 },
-      { date: '2024-01-11', revenue: 15200, orders: 44 },
-      { date: '2024-01-12', revenue: 11800, orders: 36 },
-      { date: '2024-01-13', revenue: 14500, orders: 42 },
-    ],
-  },
-  monthly: {
-    revenue: 425000,
-    orders: 1250,
-    trend: 8,
-    commission: 63750,
-    netEarnings: 361250,
-  },
-  pending: {
-    amount: 45000,
-    nextPayout: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
-  },
-  transactions: [
-    { id: '1', type: 'order', description: 'Order #ORD-1234', amount: 452, date: new Date(), status: 'completed' },
-    { id: '2', type: 'order', description: 'Order #ORD-1233', amount: 289, date: new Date(Date.now() - 3600000), status: 'completed' },
-    { id: '3', type: 'commission', description: 'Platform Commission', amount: 68, date: new Date(Date.now() - 7200000), status: 'completed' },
-    { id: '4', type: 'payout', description: 'Bank Transfer', amount: 25000, date: new Date(Date.now() - 86400000), status: 'completed' },
-    { id: '5', type: 'refund', description: 'Refund #ORD-1200', amount: 150, date: new Date(Date.now() - 172800000), status: 'completed' },
-  ],
-}
